@@ -1,0 +1,134 @@
+{
+  // ========================================
+  // General Editor
+  // ========================================
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "always",
+    "source.fixAll.eslint": "always"
+  },
+
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+
+  "editor.wordWrap": "on",
+  "editor.minimap.enabled": false,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.renderWhitespace": "selection",
+  "editor.rulers": [100],
+
+  // ========================================
+  // Files
+  // ========================================
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.autoSave": "onFocusChange",
+
+  // ========================================
+  // Explorer
+  // ========================================
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.turbo": true,
+    "**/.dart_tool": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.dart_tool": true
+  },
+
+  // ========================================
+  // TypeScript / JavaScript
+  // ========================================
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+
+  // ========================================
+  // Prettier
+  // ========================================
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // ========================================
+  // Flutter / Dart
+  // ========================================
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.rulers": [80]
+  },
+
+  "dart.lineLength": 80,
+  "dart.previewFlutterUiGuides": true,
+  "dart.showTodos": true,
+
+  // ========================================
+  // Terminal
+  // ========================================
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+
+  // ========================================
+  // Git
+  // ========================================
+  "git.autofetch": true,
+  "git.confirmSync": false,
+
+  // ========================================
+  // ESLint
+  // ========================================
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+
+  // ========================================
+  // Tailwind CSS
+  // ========================================
+  "tailwindCSS.emmetCompletions": true,
+
+  // ========================================
+  // Emmet
+  // ========================================
+  "emmet.includeLanguages": {
+    "javascript": "javascriptreact",
+    "typescript": "typescriptreact"
+  }
+}
