@@ -1,30 +1,56 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:my_app/app/app.dart';
+import 'package:my_app/core/widgets/app_chip.dart';
+import 'package:my_app/features/boards/presentation/widgets/song_card_widget.dart';
+import 'package:my_app/shared/models/song.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('AppChip renders label and handles tap', (tester) async {
+    var tapped = false;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppChip(label: 'Acoustic', onTap: () => tapped = true),
+        ),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('Acoustic'), findsOneWidget);
+    await tester.tap(find.text('Acoustic'));
+    expect(tapped, isTrue);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('song card shows user-created status', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SongCardWidget(
+            song: Song(id: '1', title: 'User song'),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('User-created'), findsOneWidget);
+  });
+
+  testWidgets('song card shows admin-created status', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SongCardWidget(
+            song: Song(
+              id: '1',
+              title: 'Admin song',
+              creatorType: SongCreatorType.admin,
+              canEdit: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Admin-created'), findsOneWidget);
   });
 }

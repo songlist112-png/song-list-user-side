@@ -75,6 +75,15 @@ class SongCardWidget extends StatelessWidget {
                 spacing: 4,
                 runSpacing: 4,
                 children: [
+                  AppChip(
+                    label: song.creatorType == SongCreatorType.admin
+                        ? 'Admin-created'
+                        : 'User-created',
+                    backgroundColor: song.creatorType == SongCreatorType.admin
+                        ? AppColors.accent
+                        : Colors.green.shade600,
+                    textColor: Colors.white,
+                  ),
                   if (song.key != null && song.key!.isNotEmpty)
                     AppChip(label: song.keyDisplay),
                   if (showArtist &&
@@ -94,7 +103,7 @@ class SongCardWidget extends StatelessWidget {
                 ],
               ),
             ],
-
+            const SizedBox(height: 6),
             // Attachment icon
             if (song.attachments.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -141,6 +150,10 @@ class SongCardWidget extends StatelessWidget {
   }
 
   bool get _hasBadges {
+    if (song.creatorType == SongCreatorType.admin ||
+        song.creatorType == SongCreatorType.user) {
+      return true;
+    }
     if (song.key != null && song.key!.isNotEmpty) return true;
     if (showArtist && song.artistName != null && song.artistName!.isNotEmpty) {
       return true;

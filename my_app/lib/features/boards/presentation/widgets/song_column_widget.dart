@@ -61,125 +61,164 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
         color: AppColors.bgColumn,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.column.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.text,
-                    ),
-                  ),
-                ),
-                if (!widget.isViewMode)
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: IconButton(
-                      onPressed: widget.onMenuTap,
-                      icon: const Icon(Icons.more_vert, size: 18),
-                      padding: EdgeInsets.zero,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // Song cards
-          if (widget.column.songs.isNotEmpty)
+      child: SingleChildScrollView(
+        primary: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: widget.onReorderSongs == null
-                  ? Column(
-                      children: widget.column.songs.map((song) {
-                        final isExpanded = _expandedSongIds.contains(song.id);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: SongCardWidget(
-                            song: song,
-                            showArtist: widget.showArtist,
-                            showBpm: widget.showBpm,
-                            isExpanded: isExpanded,
-                            availableLabels: widget.availableLabels,
-                            onTap: widget.isViewMode
-                                ? () => _toggleSongExpansion(song.id)
-                                : () => widget.onSongTap?.call(song),
-                          ),
-                        );
-                      }).toList(),
-                    )
-                  : ReorderableListView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      buildDefaultDragHandles: false, // Disable default handles to customize drag behavior
-                      onReorder: (oldIndex, newIndex) {
-                        if (widget.onReorderSongs != null) {
-                          widget.onReorderSongs!(oldIndex, newIndex);
-                        }
-                      },
-                      children: widget.column.songs.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final song = entry.value;
-                        final isExpanded = _expandedSongIds.contains(song.id);
-                        return ReorderableDelayedDragStartListener(
-                          key: ValueKey(song.id),
-                          index: index,
-                          child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.column.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                    ),
+                  ),
+                  if (!widget.isViewMode)
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: IconButton(
+                        onPressed: widget.onMenuTap,
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        padding: EdgeInsets.zero,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Song cards
+            if (widget.column.songs.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: widget.onReorderSongs == null
+                    ? Column(
+                        children: widget.column.songs.map((song) {
+                          final isExpanded = _expandedSongIds.contains(song.id);
+                          return Padding(
                             padding: const EdgeInsets.only(bottom: 6),
                             child: SongCardWidget(
                               song: song,
                               showArtist: widget.showArtist,
                               showBpm: widget.showBpm,
                               isExpanded: isExpanded,
-                              isReorderable: true,
                               availableLabels: widget.availableLabels,
                               onTap: widget.isViewMode
                                   ? () => _toggleSongExpansion(song.id)
                                   : () => widget.onSongTap?.call(song),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ),
+                          );
+                        }).toList(),
+                      )
+                    : ReorderableListView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
 
-          // Add song button
-          if (!widget.isViewMode)
-            InkWell(
-              onTap: widget.onAddSong,
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.add, size: 18, color: AppColors.textMuted),
-                    SizedBox(width: 6),
-                    Text(
-                      'Add song',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textMuted,
+                        proxyDecorator:
+                            (
+                              Widget child,
+                              int index,
+                              Animation<double> animation,
+                            ) {
+                              return AnimatedBuilder(
+                                animation: animation,
+                                builder: (context, _) {
+                                  final scale =
+                                      Tween<double>(
+                                        begin: 1.0,
+                                        end: 1.02,
+                                      ).evaluate(
+                                        CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeOut,
+                                        ),
+                                      );
+
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: Material(
+                                      type: MaterialType.transparency,
+                                      elevation: 8,
+                                      shadowColor: Colors.black26,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+
+                        onReorderItem: (oldIndex, newIndex) {
+                          widget.onReorderSongs?.call(oldIndex, newIndex);
+                        },
+
+                        children: widget.column.songs.asMap().entries.map((
+                          entry,
+                        ) {
+                          final index = entry.key;
+                          final song = entry.value;
+                          final isExpanded = _expandedSongIds.contains(song.id);
+
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey(song.id),
+                            index: index,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: SongCardWidget(
+                                song: song,
+                                showArtist: widget.showArtist,
+                                showBpm: widget.showBpm,
+                                isExpanded: isExpanded,
+                                isReorderable: true,
+                                availableLabels: widget.availableLabels,
+                                onTap: widget.isViewMode
+                                    ? () => _toggleSongExpansion(song.id)
+                                    : () => widget.onSongTap?.call(song),
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
-                    ),
-                  ],
+              ),
+
+            // Add song button
+            if (!widget.isViewMode)
+              InkWell(
+                onTap: widget.onAddSong,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.add, size: 18, color: AppColors.textMuted),
+                      SizedBox(width: 6),
+                      Text(
+                        'Add song',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
