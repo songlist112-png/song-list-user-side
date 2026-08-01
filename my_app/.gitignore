@@ -45,7 +45,9 @@ app.*.map.json
 /android/app/release
 
 .env
+dart_defines.local.json
 AGENTS.md
 .agents/
-
-supabase/migrations
+.codegraph/
+.ai
+docs

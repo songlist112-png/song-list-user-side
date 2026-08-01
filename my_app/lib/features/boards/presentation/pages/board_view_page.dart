@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/models/artist.dart';
@@ -6,24 +9,31 @@ import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_column.dart';
 import '../../../../shared/models/song_list.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
+import '../../application/board_detail_controller.dart';
+import '../../data/board_repository.dart';
+import '../../domain/board_filter.dart';
+import '../providers/search_history_provider.dart';
 import '../widgets/add_column_button.dart';
 import '../widgets/key_filter_bar.dart';
 import '../widgets/menu_bottom_sheet.dart';
+import '../widgets/name_prompt_dialog.dart';
 import '../widgets/song_column_widget.dart';
 
-class BoardViewPage extends StatefulWidget {
+class BoardViewPage extends ConsumerStatefulWidget {
   final String boardId;
 
   const BoardViewPage({super.key, required this.boardId});
 
   @override
-  State<BoardViewPage> createState() => _BoardViewPageState();
+  ConsumerState<BoardViewPage> createState() => _BoardViewPageState();
 }
 
-class _BoardViewPageState extends State<BoardViewPage> {
-  // Sample data — will be replaced with real data later
+class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   late SongList _songList;
+  bool _isLoading = true;
+  Object? _loadError;
 
   // Key filter state
   String? _activeKey;
@@ -36,147 +46,191 @@ class _BoardViewPageState extends State<BoardViewPage> {
   // Search state
   bool _isSearchMode = false;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+  List<String> _searchSuggestions = [];
+  Timer? _debounceTimer;
+  StreamSubscription<void>? _boardSubscription;
+
+  BoardRepository get _repository => ref.read(boardRepositoryProvider);
 
   @override
   void initState() {
     super.initState();
-    // Load sample data based on board ID
-    _songList = _loadSampleData();
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text;
-      });
+    _songList = SongList(
+      id: widget.boardId,
+      ownerId: '',
+      name: '',
+      canEdit: false,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+    );
+    _loadBoard();
+    _boardSubscription = _repository.watchChanges().listen((_) {
+      if (mounted) unawaited(_loadBoard());
+    });
+    _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus) {
+        _hideSuggestions();
+      }
     });
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _boardSubscription?.cancel();
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  SongList _loadSampleData() {
-    if (widget.boardId == '2') {
-      return SongList(
-        id: '2',
-        name: 'My own list',
-        columns: [
-          SongColumn(
-            id: 'c3',
-            title: 'List 1',
-            songs: [
-              const Song(
-                id: 's2',
-                title: 'Perfectt',
-                key: 'G',
-                keyType: 'Minor',
-                artistName: 'Ed Sheeran',
-                attachments: ['file.pdf'],
-              ),
-            ],
-            order: 0,
-          ),
-          const SongColumn(id: 'c4', title: 'New List', order: 1),
-        ],
-        artists: [const Artist(id: 'a1', name: 'Ed Sheeran')],
-        showArtist: true,
-        createdAt: DateTime.now(),
-      );
+  Future<void> _loadBoard() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final board = await _repository.fetchBoard(widget.boardId);
+      if (mounted) setState(() => _songList = board);
+    } on Exception catch (error) {
+      if (mounted) setState(() => _loadError = error);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    return SongList(
-      id: '1',
-      name: 'My Song List',
-      columns: [
-        SongColumn(
-          id: 'c1',
-          title: 'List 1',
-          songs: [
-            const Song(
-              id: 's1',
-              title: 'Perfect',
-              key: 'G',
-              keyType: 'Minor',
-              lyrics: ' Lyrics here He...Lyrics here He... Lyrics here He...',
-              artistName: 'Ed Sheeran',
-              attachments: ['file.pdf'],
-            ),
-            const Song(
-              id: 's2',
-              title: 'The Hard Way',
-              key: 'C',
-              keyType: 'Minor',
-              lyrics:
-                  ' The Hard way yeah yeah ohh oh nono make me hard so close.',
-              artistName: 'Paul',
-              attachments: ['file.pdf'],
-            ),
-          ],
-          order: 0,
+  }
+
+  void _showError(Object error) {
+    debugPrint('Board operation failed: $error');
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Could not save change: $error')));
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (!mounted) return;
+    setState(() => _searchQuery = query);
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() => _searchSuggestions = _computeSuggestions(query));
+    });
+  }
+
+  List<String> _computeSuggestions(String query) {
+    final normalized = query.trim().toLowerCase();
+    final history = ref.read(searchHistoryProvider);
+
+    if (normalized.isEmpty) {
+      return history.take(5).toList();
+    }
+
+    final suggestions = <String>[];
+
+    for (final h in history) {
+      if (h.toLowerCase().contains(normalized)) {
+        suggestions.add(h);
+      }
+    }
+
+    for (final column in _songList.columns) {
+      if (column.title.toLowerCase().contains(normalized) &&
+          !suggestions.contains(column.title)) {
+        suggestions.add(column.title);
+      }
+    }
+
+    for (final song in _songList.columns.expand((c) => c.songs)) {
+      if (song.title.toLowerCase().contains(normalized) &&
+          !suggestions.contains(song.title)) {
+        suggestions.add(song.title);
+      }
+      if (song.artistName != null &&
+          song.artistName!.toLowerCase().contains(normalized) &&
+          !suggestions.contains(song.artistName!)) {
+        suggestions.add(song.artistName!);
+      }
+    }
+
+    return suggestions.take(8).toList();
+  }
+
+  void _onSuggestionSelected(String suggestion) {
+    _searchController.text = suggestion;
+    _hideSuggestions();
+  }
+
+  void _hideSuggestions() {
+    _debounceTimer?.cancel();
+    if (mounted) setState(() => _searchSuggestions = []);
+  }
+
+  Widget _buildSearchSuggestions() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
         ),
-        const SongColumn(
-          id: 'c2',
-          title: 'New List',
-          songs: [
-            Song(
-              id: 's1',
-              title: 'Im Board',
-              key: 'A',
-              keyType: 'Minor',
-              lyrics: ' Lyrics here He...Lyrics here He... Lyrics here He...',
-              artistName: 'Mr. Cupido',
-              attachments: ['file.pdf'],
-            ),
-          ],
-          order: 1,
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _searchSuggestions.length,
+        separatorBuilder: (_, _) => Divider(
+          height: 1,
+          color: AppColors.border.withValues(alpha: 0.3),
+          indent: 16,
+          endIndent: 16,
         ),
-        const SongColumn(id: 'c5', title: 'New List', order: 2),
-      ],
-      artists: [const Artist(id: 'a1', name: 'Ed Sheeran')],
-      showArtist: true,
-      createdAt: DateTime.now(),
+        itemBuilder: (context, index) {
+          final suggestion = _searchSuggestions[index];
+          return ListTile(
+            leading: const Icon(
+              Icons.search,
+              size: 18,
+              color: AppColors.textMuted,
+            ),
+            title: Text(
+              suggestion,
+              style: const TextStyle(fontSize: 15, color: AppColors.text),
+            ),
+            onTap: () => _onSuggestionSelected(suggestion),
+          );
+        },
+      ),
     );
   }
 
-  void _addColumn() {
-    final controller = TextEditingController(text: 'New List');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add List'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'List name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                setState(() {
-                  final newColumns = List<SongColumn>.from(_songList.columns)
-                    ..add(
-                      SongColumn(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: name,
-                        order: _songList.columns.length,
-                      ),
-                    );
-                  _songList = _songList.copyWith(columns: newColumns);
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+  Future<void> _addColumn() async {
+    final name = await showNamePrompt(
+      context,
+      title: 'Add List',
+      initialValue: 'New List',
+      label: 'List name',
+      actionLabel: 'Add',
     );
+    if (name == null) return;
+
+    try {
+      final column = await _repository.createColumn(
+        _songList.id,
+        name,
+        _songList.columns.length,
+      );
+      if (mounted) {
+        setState(() {
+          _songList = _songList.copyWith(
+            columns: [..._songList.columns, column],
+          );
+        });
+        AppSnackbar.showSuccess(context, 'Column created');
+      }
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   void _addSongToColumn(String columnId) {
@@ -189,18 +243,27 @@ class _BoardViewPageState extends State<BoardViewPage> {
       builder: (_) => AddEditSongPage(
         availableArtists: _songList.artists.map((a) => a.name).toList(),
         availableLabels: _songList.labels,
-        onSave: (song) {
+        onDownloadAttachment: _repository.downloadAttachment,
+        onSave: (song) async {
+          final column = _songList.columns.firstWhere(
+            (item) => item.id == columnId,
+          );
+          final savedSong = await _repository.createSong(
+            columnId,
+            song,
+            column.songs.length,
+          );
+          if (!mounted) return;
           setState(() {
             final columns = _songList.columns.map((col) {
               if (col.id == columnId) {
-                return col.copyWith(
-                  songs: List<Song>.from(col.songs)..add(song),
-                );
+                return col.copyWith(songs: [...col.songs, savedSong]);
               }
               return col;
             }).toList();
             _songList = _songList.copyWith(columns: columns);
           });
+          AppSnackbar.showSuccess(context, 'Song created');
         },
       ),
     );
@@ -227,16 +290,35 @@ class _BoardViewPageState extends State<BoardViewPage> {
         existingSong: song,
         availableArtists: allArtistNames,
         availableLabels: _songList.labels,
-        onSave: (updatedSong) {
+        onDownloadAttachment: _repository.downloadAttachment,
+        onSave: (updatedSong) async {
+          final savedSong = await _repository.updateSong(updatedSong);
+          if (!mounted) return;
           setState(() {
             final columns = _songList.columns.map((col) {
               if (col.id == columnId) {
                 final updatedSongs = col.songs.map((s) {
-                  return s.id == updatedSong.id ? updatedSong : s;
+                  return s.id == savedSong.id ? savedSong : s;
                 }).toList();
                 return col.copyWith(songs: updatedSongs);
               }
               return col;
+            }).toList();
+            _songList = _songList.copyWith(columns: columns);
+          });
+          AppSnackbar.showSuccess(context, 'Song updated');
+        },
+        onDelete: () async {
+          await _repository.deleteSong(song.id);
+          if (!mounted) return;
+          setState(() {
+            final columns = _songList.columns.map((column) {
+              if (column.id != columnId) return column;
+              return column.copyWith(
+                songs: column.songs
+                    .where((item) => item.id != song.id)
+                    .toList(),
+              );
             }).toList();
             _songList = _songList.copyWith(columns: columns);
           });
@@ -249,18 +331,48 @@ class _BoardViewPageState extends State<BoardViewPage> {
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
+    final column = _songList.columns.firstWhere((item) => item.id == columnId);
+    final songs = List<Song>.from(column.songs);
+    final song = songs.removeAt(oldIndex);
+    songs.insert(newIndex, song);
     setState(() {
-      final columns = _songList.columns.map((col) {
-        if (col.id == columnId) {
-          final songs = List<Song>.from(col.songs);
-          final song = songs.removeAt(oldIndex);
-          songs.insert(newIndex, song);
-          return col.copyWith(songs: songs);
-        }
-        return col;
-      }).toList();
+      final columns = _songList.columns
+          .map(
+            (item) => item.id == columnId ? item.copyWith(songs: songs) : item,
+          )
+          .toList();
       _songList = _songList.copyWith(columns: columns);
     });
+    _repository.reorderSongs(songs).catchError((Object error) {
+      if (mounted) _showError(error);
+    });
+  }
+
+  Future<bool> _saveBoard(SongList board) async {
+    setState(() => _songList = board);
+    ref.read(boardDetailIsMutatingProvider.notifier).state = true;
+    try {
+      await _repository.updateBoard(board);
+      return true;
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+      return false;
+    } finally {
+      ref.read(boardDetailIsMutatingProvider.notifier).state = false;
+    }
+  }
+
+  Future<void> _removeLabel(String id) async {
+    try {
+      await _repository.deleteLabel(id);
+      if (!mounted) return;
+      final labels = _songList.labels.where((label) => label.id != id).toList();
+      setState(() => _songList = _songList.copyWith(labels: labels));
+      Navigator.pop(context);
+      _showMenu();
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   void _showMenu() {
@@ -276,49 +388,21 @@ class _BoardViewPageState extends State<BoardViewPage> {
         darkMode: _songList.darkMode,
         artists: _songList.artists,
         labels: _songList.labels,
-        onShowArtistChanged: (val) {
-          setState(() {
-            _songList = _songList.copyWith(showArtist: val);
-          });
-        },
-        onShowBpmChanged: (val) {
-          setState(() {
-            _songList = _songList.copyWith(showBpm: val);
-          });
-        },
-        onDarkModeChanged: (val) {
-          setState(() {
-            _songList = _songList.copyWith(darkMode: val);
-          });
-        },
-        onAddArtist: (name) {
-          // Will show a text field to add artist name
-          _showAddArtistDialog();
-        },
-        onRemoveArtist: (id) {
-          setState(() {
-            final updatedArtists = _songList.artists
-                .where((a) => a.id != id)
-                .toList();
-            _songList = _songList.copyWith(artists: updatedArtists);
-          });
-          Navigator.pop(context);
-          _showMenu(); // Re-open to reflect changes
-        },
-        onUpdateArtist: (_) {},
+        onShowArtistChanged: (val) =>
+            _saveBoard(_songList.copyWith(showArtist: val)),
+        onShowBpmChanged: (val) => _saveBoard(_songList.copyWith(showBpm: val)),
+        onDarkModeChanged: (val) =>
+            _saveBoard(_songList.copyWith(darkMode: val)),
+        onAddArtist: _showArtistDialog,
+        onRemoveArtist: _removeArtist,
+        onUpdateArtist: _showArtistDialog,
         onAddLabel: (name) {
           _showAddLabelDialog();
         },
-        onRemoveLabel: (id) {
-          setState(() {
-            final updatedLabels = _songList.labels
-                .where((l) => l.id != id)
-                .toList();
-            _songList = _songList.copyWith(labels: updatedLabels);
-          });
-          Navigator.pop(context);
-          _showMenu(); // Re-open to reflect changes
+        onUpdateLabel: (label) {
+          _showAddLabelDialog(label);
         },
+        onRemoveLabel: _removeLabel,
         onExport: () {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -335,216 +419,55 @@ class _BoardViewPageState extends State<BoardViewPage> {
     );
   }
 
-  void _showAddArtistDialog() {
-    Navigator.pop(context); // Close menu first
-
-    final controller = TextEditingController();
-    final themeColor = const Color.fromARGB(255, 16, 135, 225);
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            // Get screen size for responsive design
-            final screenWidth = MediaQuery.of(context).size.width;
-            final bool isSmallScreen = screenWidth < 380;
-
-            // Responsive sizing
-            final double iconSize = isSmallScreen ? 46 : 58;
-            final double titleFontSize = isSmallScreen ? 20 : 24;
-            final double subtitleFontSize = isSmallScreen ? 13 : 15;
-            final double spacing = isSmallScreen ? 12 : 20;
-            final double padding = isSmallScreen ? 16 : 24;
-
-            return Dialog(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(padding),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Icon
-                    Container(
-                      width: iconSize,
-                      height: iconSize,
-                      decoration: BoxDecoration(
-                        color: themeColor.withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        Icons.person_add_alt_1_rounded,
-                        color: themeColor,
-                        size: iconSize * 0.5,
-                      ),
-                    ),
-
-                    SizedBox(height: spacing),
-
-                    // Title
-                    Text(
-                      'Add Artist',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-
-                    SizedBox(height: spacing * 0.4),
-
-                    // Subtitle
-                    Text(
-                      'Add a new artist to your collection.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: subtitleFontSize,
-                        color: Colors.grey,
-                        height: 1.5,
-                      ),
-                    ),
-
-                    SizedBox(height: spacing * 1.2),
-
-                    // TextField
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        hintText: 'Artist name',
-                        hintStyle: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                        prefixIcon: Icon(
-                          Icons.music_note_outlined,
-                          size: isSmallScreen ? 18 : 24,
-                          color: themeColor,
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 12 : 16,
-                          vertical: isSmallScreen ? 12 : 16,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: themeColor, width: 1.5),
-                        ),
-                      ),
-                      onSubmitted: (value) {
-                        _addArtist(controller, dialogContext);
-                      },
-                    ),
-
-                    SizedBox(height: spacing * 1.6),
-
-                    // Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pop(dialogContext);
-                              _showMenu();
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(
-                                vertical: isSmallScreen ? 12 : 15,
-                                horizontal: isSmallScreen ? 8 : 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              textStyle: TextStyle(
-                                fontSize: isSmallScreen ? 13 : 14,
-                              ),
-                              side: BorderSide(color: themeColor),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              style: TextStyle(color: themeColor),
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(width: isSmallScreen ? 8 : 12),
-
-                        Expanded(
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: themeColor,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(
-                                vertical: isSmallScreen ? 12 : 15,
-                                horizontal: isSmallScreen ? 8 : 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              textStyle: TextStyle(
-                                fontSize: isSmallScreen ? 13 : 14,
-                              ),
-                            ),
-                            onPressed: () {
-                              _addArtist(controller, dialogContext);
-                            },
-                            child: Text(
-                              'Add Artist',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: isSmallScreen ? 13 : 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Future<void> _showArtistDialog([Artist? existing]) async {
+    Navigator.pop(context);
+    final name = await showNamePrompt(
+      context,
+      title: existing == null ? 'Add Artist' : 'Rename Artist',
+      initialValue: existing?.name ?? '',
+      label: 'Artist name',
+      actionLabel: existing == null ? 'Add' : 'Save',
     );
+    if (name == null || name == existing?.name) return;
+
+    try {
+      final saved = existing == null
+          ? await _repository.createArtist(name)
+          : await _repository.updateArtist(existing.copyWith(name: name));
+      if (!mounted) return;
+      final artists = existing == null
+          ? [..._songList.artists, saved]
+          : _songList.artists
+                .map((artist) => artist.id == saved.id ? saved : artist)
+                .toList();
+      setState(() => _songList = _songList.copyWith(artists: artists));
+      if (existing == null) {
+        AppSnackbar.showSuccess(context, 'Artist created');
+      }
+      _showMenu();
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
-  // Helper method to add artist
-  void _addArtist(
-    TextEditingController controller,
-    BuildContext dialogContext,
-  ) {
-    final name = controller.text.trim();
-
-    if (name.isEmpty) return;
-
-    setState(() {
-      final updatedArtists = List<Artist>.from(_songList.artists)
-        ..add(
-          Artist(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            name: name,
-          ),
-        );
-      _songList = _songList.copyWith(artists: updatedArtists);
-    });
-
-    Navigator.pop(dialogContext);
-    _showMenu(); // Re-open menu
+  Future<void> _removeArtist(String id) async {
+    try {
+      await _repository.deleteArtist(id);
+      final board = await _repository.fetchBoard(widget.boardId);
+      if (!mounted) return;
+      setState(() => _songList = board);
+      Navigator.pop(context);
+      _showMenu();
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
-  void _showAddLabelDialog() {
+  void _showAddLabelDialog([Label? existingLabel]) {
     Navigator.pop(context); // Close menu first
 
-    final controller = TextEditingController();
-    Color selectedColor = Colors.blue;
+    final controller = TextEditingController(text: existingLabel?.name);
+    Color selectedColor = existingLabel?.color ?? Colors.blue;
 
     showDialog(
       context: context,
@@ -731,33 +654,54 @@ class _BoardViewPageState extends State<BoardViewPage> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            onPressed: () {
+                            onPressed: () async {
                               final name = controller.text.trim();
 
                               if (name.isEmpty) return;
 
-                              setState(() {
-                                final updatedLabels =
-                                    List<Label>.from(_songList.labels)..add(
-                                      Label(
-                                        id: DateTime.now()
-                                            .millisecondsSinceEpoch
-                                            .toString(),
-                                        name: name,
-                                        color: selectedColor,
-                                      ),
-                                    );
-
-                                _songList = _songList.copyWith(
-                                  labels: updatedLabels,
-                                );
-                              });
-
-                              Navigator.pop(dialogContext);
-                              _showMenu();
+                              try {
+                                final label = existingLabel == null
+                                    ? await _repository.createLabel(
+                                        _songList.id,
+                                        name,
+                                        selectedColor,
+                                      )
+                                    : await _repository.updateLabel(
+                                        _songList.id,
+                                        existingLabel.copyWith(
+                                          name: name,
+                                          color: selectedColor,
+                                        ),
+                                      );
+                                if (!mounted || !dialogContext.mounted) return;
+                                setState(() {
+                                  final labels = existingLabel == null
+                                      ? [..._songList.labels, label]
+                                      : _songList.labels
+                                            .map(
+                                              (item) => item.id == label.id
+                                                  ? label
+                                                  : item,
+                                            )
+                                            .toList();
+                                  _songList = _songList.copyWith(
+                                    labels: labels,
+                                  );
+                                });
+                                Navigator.pop(dialogContext);
+                                if (existingLabel == null) {
+                                  AppSnackbar.showSuccess(
+                                    context,
+                                    'Label created',
+                                  );
+                                }
+                                _showMenu();
+                              } on Exception catch (error) {
+                                if (mounted) _showError(error);
+                              }
                             },
                             child: const Text(
-                              'Add Label',
+                              'Save Label',
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -795,14 +739,20 @@ class _BoardViewPageState extends State<BoardViewPage> {
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
               title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
-                setState(() {
+                try {
+                  await _repository.deleteColumn(column.id);
+                  if (!mounted) return;
                   final columns = _songList.columns
                       .where((c) => c.id != column.id)
                       .toList();
-                  _songList = _songList.copyWith(columns: columns);
-                });
+                  setState(
+                    () => _songList = _songList.copyWith(columns: columns),
+                  );
+                } on Exception catch (error) {
+                  if (mounted) _showError(error);
+                }
               },
             ),
           ],
@@ -811,36 +761,25 @@ class _BoardViewPageState extends State<BoardViewPage> {
     );
   }
 
-  void _renameColumn(SongColumn column) {
-    final controller = TextEditingController(text: column.title);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Rename List'),
-        content: TextField(controller: controller, autofocus: true),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                setState(() {
-                  final columns = _songList.columns.map((c) {
-                    return c.id == column.id ? c.copyWith(title: name) : c;
-                  }).toList();
-                  _songList = _songList.copyWith(columns: columns);
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+  Future<void> _renameColumn(SongColumn column) async {
+    final name = await showNamePrompt(
+      context,
+      title: 'Rename List',
+      initialValue: column.title,
+      label: 'List name',
     );
+    if (name == null || name == column.title) return;
+    final updatedColumn = column.copyWith(title: name);
+    try {
+      await _repository.updateColumn(updatedColumn);
+      if (!mounted) return;
+      final columns = _songList.columns
+          .map((item) => item.id == column.id ? updatedColumn : item)
+          .toList();
+      setState(() => _songList = _songList.copyWith(columns: columns));
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   void _showSearch() {
@@ -859,8 +798,34 @@ class _BoardViewPageState extends State<BoardViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredColumns = _getFilteredColumns();
-    final bool hasFilters = _activeKey != null || _activeAccidental != null || _searchQuery.isNotEmpty;
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_loadError != null) {
+      return Scaffold(
+        backgroundColor: AppColors.bg,
+        appBar: AppBar(),
+        body: Center(
+          child: FilledButton(
+            onPressed: _loadBoard,
+            child: const Text('Retry loading board'),
+          ),
+        ),
+      );
+    }
+
+    final filteredColumns = BoardFilter.columns(
+      _songList.columns,
+      query: _searchQuery,
+    );
+    final hasFilters =
+        _activeKey != null ||
+        _activeAccidental != null ||
+        _searchQuery.isNotEmpty;
+    final canMutate = _songList.canEdit && (!_isViewMode || _isEditMode);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -874,6 +839,7 @@ class _BoardViewPageState extends State<BoardViewPage> {
         title: _isSearchMode
             ? TextField(
                 controller: _searchController,
+                focusNode: _searchFocusNode,
                 autofocus: true,
                 style: const TextStyle(color: Colors.white, fontSize: 16),
                 cursorColor: const Color.fromARGB(255, 235, 234, 234),
@@ -888,6 +854,11 @@ class _BoardViewPageState extends State<BoardViewPage> {
                   fillColor: Colors.transparent,
                   contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
+                onSubmitted: (value) {
+                  ref.read(searchHistoryProvider.notifier).addSearch(value);
+                  _hideSuggestions();
+                  _searchFocusNode.unfocus();
+                },
               )
             : Text(_songList.name),
         actions: _isSearchMode
@@ -907,36 +878,44 @@ class _BoardViewPageState extends State<BoardViewPage> {
                   onPressed: _showSearch,
                 ),
                 // Menu (three dots)
-                IconButton(
-                  icon: const Icon(Icons.more_vert, size: 22),
-                  onPressed: _showMenu,
-                ),
-                // Toggle between Edit and View icons
-                IconButton(
-                  icon: Icon(
-                    _isViewMode && !_isEditMode ? Icons.edit : Icons.visibility,
-                    size: _isViewMode && !_isEditMode ? 20 : 22,
+                if (_songList.canEdit)
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 22),
+                    onPressed: _showMenu,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      if (!_isViewMode) {
-                        // Click eye icon → enter view mode
-                        _isViewMode = true;
-                        _isEditMode = false;
-                      } else if (!_isEditMode) {
-                        // Click edit icon → enter edit mode
-                        _isEditMode = true;
-                      } else {
-                        // Click eye icon again → exit edit mode, stay in view mode
-                        _isEditMode = false;
-                      }
-                    });
-                  },
-                ),
+                // Toggle between Edit and View icons
+                if (_songList.canEdit)
+                  IconButton(
+                    icon: Icon(
+                      _isViewMode && !_isEditMode
+                          ? Icons.edit
+                          : Icons.visibility,
+                      size: _isViewMode && !_isEditMode ? 20 : 22,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        if (!_isViewMode) {
+                          // Click eye icon Ã¢â€ â€™ enter view mode
+                          _isViewMode = true;
+                          _isEditMode = false;
+                        } else if (!_isEditMode) {
+                          // Click edit icon Ã¢â€ â€™ enter edit mode
+                          _isEditMode = true;
+                        } else {
+                          // Click eye icon again Ã¢â€ â€™ exit edit mode, stay in view mode
+                          _isEditMode = false;
+                        }
+                      });
+                    },
+                  ),
               ],
       ),
       body: Column(
         children: [
+          // Search suggestions overlay
+          if (_isSearchMode && _searchSuggestions.isNotEmpty)
+            _buildSearchSuggestions(),
+
           // Key filter bar - hide when search has no results
           if (filteredColumns.isNotEmpty)
             KeyFilterBar(
@@ -958,7 +937,7 @@ class _BoardViewPageState extends State<BoardViewPage> {
 
           // Columns (horizontal scrolling)
           Expanded(
-            child: _getFilteredColumns().isEmpty
+            child: filteredColumns.isEmpty
                 ? _searchQuery.isNotEmpty
                       // Search returned no results
                       ? Center(
@@ -1020,7 +999,7 @@ class _BoardViewPageState extends State<BoardViewPage> {
                                   ),
                                 ),
 
-                                if (!_isViewMode || _isEditMode) ...[
+                                if (canMutate) ...[
                                   const SizedBox(height: 24),
                                   ElevatedButton.icon(
                                     onPressed: _addColumn,
@@ -1039,8 +1018,12 @@ class _BoardViewPageState extends State<BoardViewPage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ..._getFilteredColumns().map((column) {
-                          final filteredSongs = _filterSongs(column.songs);
+                        ...filteredColumns.map((column) {
+                          final filteredSongs = BoardFilter.songs(
+                            column.songs,
+                            key: _activeKey,
+                            accidental: _activeAccidental,
+                          );
                           final filteredColumn = column.copyWith(
                             songs: filteredSongs,
                           );
@@ -1051,23 +1034,29 @@ class _BoardViewPageState extends State<BoardViewPage> {
                               column: filteredColumn,
                               showArtist: _songList.showArtist,
                               showBpm: _songList.showBpm,
-                              isViewMode: _isViewMode && !_isEditMode,
+                              isViewMode: !canMutate,
                               availableLabels: _songList.labels,
                               onAddSong: () =>
                                   _addSongToColumn(filteredColumn.id),
                               onMenuTap: () => _showColumnMenu(filteredColumn),
-                              onSongTap: _isViewMode && !_isEditMode
+                              onSongTap: !canMutate
                                   ? null
-                                  : (song) => _editSong(song, column.id),
-                              onReorderSongs: hasFilters
+                                  : (song) {
+                                      if (song.canEdit) {
+                                        _editSong(song, column.id);
+                                      }
+                                    },
+                              onReorderSongs: hasFilters || !canMutate
                                   ? null
-                                  : (oldIndex, newIndex) =>
-                                      _reorderSongs(column.id, oldIndex, newIndex),
+                                  : (oldIndex, newIndex) => _reorderSongs(
+                                      column.id,
+                                      oldIndex,
+                                      newIndex,
+                                    ),
                             ),
                           );
                         }),
-                        if (!_isViewMode || _isEditMode)
-                          AddColumnButton(onTap: _addColumn),
+                        if (canMutate) AddColumnButton(onTap: _addColumn),
                       ],
                     ),
                   ),
@@ -1075,67 +1064,5 @@ class _BoardViewPageState extends State<BoardViewPage> {
         ],
       ),
     );
-  }
-
-  List<Song> _filterSongs(List<Song> songs) {
-    if (_activeKey == null && _activeAccidental == null) return songs;
-
-    return songs.where((song) {
-      if (song.key == null || song.key!.isEmpty) return false;
-
-      if (_activeKey != null) {
-        if (!song.key!.startsWith(_activeKey!)) return false;
-      }
-
-      if (_activeAccidental != null) {
-        if (_activeAccidental == 'flat' && !song.key!.contains('b')) {
-          return false;
-        }
-        if (_activeAccidental == 'sharp' && !song.key!.contains('#')) {
-          return false;
-        }
-      }
-
-      return true;
-    }).toList();
-  }
-
-  List<SongColumn> _getFilteredColumns() {
-    if (_searchQuery.isEmpty) {
-      return _songList.columns;
-    }
-
-    final query = _searchQuery.toLowerCase();
-    final filteredColumns = <SongColumn>[];
-
-    for (var column in _songList.columns) {
-      // Check if column title matches
-      final columnMatches = column.title.toLowerCase().contains(query);
-
-      // Filter songs in this column
-      final filteredSongs = column.songs.where((song) {
-        // Search in song title
-        if (song.title.toLowerCase().contains(query)) return true;
-        // Search in artist name
-        if (song.artistName != null &&
-            song.artistName!.toLowerCase().contains(query)) {
-          return true;
-        }
-        // Search in key
-        if (song.key != null && song.key!.toLowerCase().contains(query)) {
-          return true;
-        }
-        return false;
-      }).toList();
-
-      // Include column if it matches or has matching songs
-      if (columnMatches || filteredSongs.isNotEmpty) {
-        filteredColumns.add(
-          column.copyWith(songs: columnMatches ? column.songs : filteredSongs),
-        );
-      }
-    }
-
-    return filteredColumns;
   }
 }

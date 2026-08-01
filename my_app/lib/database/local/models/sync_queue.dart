@@ -17,4 +17,11 @@ class SyncQueue {
   late String status;
 
   late DateTime createdAt;
+
+  @Index()
+  late String userId;
+
+  int attempts = 0;
+  DateTime? nextAttemptAt;
+  String? lastError;
 }

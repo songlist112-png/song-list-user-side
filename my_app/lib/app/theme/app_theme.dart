@@ -28,9 +28,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.bgCard,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         margin: EdgeInsets.zero,
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -48,23 +46,22 @@ class AppTheme {
           borderRadius: BorderRadius.circular(4),
           borderSide: const BorderSide(color: AppColors.accent, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         labelStyle: const TextStyle(color: AppColors.textMuted),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.textMuted,
-        ),
+        style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.accent,
@@ -84,9 +81,7 @@ class AppTheme {
         side: const BorderSide(color: AppColors.textMuted),
       ),
       dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: AppColors.bgCard,
       ),
       bottomSheetTheme: const BottomSheetThemeData(
