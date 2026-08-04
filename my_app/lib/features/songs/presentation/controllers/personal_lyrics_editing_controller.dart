@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/app_colors.dart';
 import '../../domain/lyric_line_origin.dart';
 
 class PersonalLyricsEditingController extends TextEditingController {
@@ -39,7 +40,7 @@ class PersonalLyricsEditingController extends TextEditingController {
               text: '${entry.$2.text}$suffix',
               style: TextStyle(
                 color: entry.$2.isPersonal
-                    ? const Color.fromARGB(255, 4, 150, 58)
+                    ? AppColors.personalEdit
                     : Colors.black,
               ),
             );

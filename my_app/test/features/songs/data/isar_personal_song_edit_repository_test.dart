@@ -70,6 +70,7 @@ void main() {
     final repository = IsarPersonalSongEditRepository(
       isar: isar,
       userId: () => activeUser,
+      onSyncNeeded: () => syncRequests++,
     );
     await repository.save(songId: 'admin-song', lyrics: 'Private');
     await repository.remove('admin-song');
@@ -78,6 +79,7 @@ void main() {
     final queue = (await isar.syncQueues.where().findAll()).single;
     expect(edit.deleted, isTrue);
     expect(jsonDecode(queue.payload!)['deleted'], isTrue);
+    expect(syncRequests, 2);
   });
 }
 

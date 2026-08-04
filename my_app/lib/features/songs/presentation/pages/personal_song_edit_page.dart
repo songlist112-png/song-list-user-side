@@ -22,21 +22,31 @@ class PersonalSongEditPage extends StatefulWidget {
 
 class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
   late final PersonalLyricsEditingController _lyricsController;
+  late final String _initialLyrics;
   bool _saving = false;
+  bool _hasChanges = false;
 
   @override
   void initState() {
     super.initState();
+    _initialLyrics = widget.song.displayedLyrics ?? '';
     _lyricsController = PersonalLyricsEditingController(
       originalLyrics: widget.song.lyrics ?? '',
-      text: widget.song.displayedLyrics,
-    );
+      text: _initialLyrics,
+    )..addListener(_updateDirtyState);
   }
 
   @override
   void dispose() {
+    _lyricsController.removeListener(_updateDirtyState);
     _lyricsController.dispose();
     super.dispose();
+  }
+
+  void _updateDirtyState() {
+    final hasChanges = _lyricsController.text != _initialLyrics;
+    if (hasChanges == _hasChanges || !mounted) return;
+    setState(() => _hasChanges = hasChanges);
   }
 
   Future<void> _run(Future<void> Function() operation) async {
@@ -73,10 +83,17 @@ class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
               icon: const Icon(Icons.restore),
             ),
           TextButton(
-            onPressed: _saving
+            onPressed: _saving || !_hasChanges
                 ? null
                 : () => _run(() => widget.onSave(_lyricsController.text)),
-            child: const Text('Save'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white38,
+            ),
+            child: const Text(
+              'Save',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
