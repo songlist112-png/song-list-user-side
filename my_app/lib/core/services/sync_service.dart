@@ -11,11 +11,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../database/local/models/cached_board.dart';
 import '../../database/local/models/profile.dart';
+import '../../database/local/models/personal_song_edit.dart';
 import '../../database/local/models/sync_metadata.dart';
 import '../../database/local/models/sync_queue.dart';
 import '../../database/remote/datasources/profile_remote_datasource.dart';
 import '../../database/remote/datasources/song_remote_datasource.dart';
 import '../../features/boards/data/board_codec.dart';
+import '../../features/songs/domain/personal_song_edit_conflict_resolver.dart';
 import '../../shared/models/song_attachment.dart';
 import '../../shared/models/song_list.dart';
 
@@ -102,14 +104,21 @@ class SyncService {
       if (connectivity.contains(ConnectivityResult.none)) return;
 
       final metadata = await _metadataFor(userId);
-      final pending = await _discardUnauthorizedReorders(
+      var pending = await _discardUnauthorizedReorders(
         userId,
         await _pendingFor(userId),
       );
+      // Capture watermark before reads so changes racing this pull remain
+      // strictly newer and are collected by the next incremental sync.
       final preparationFuture = Future.wait<Object?>([
         _remote.serverTime(),
         _syncProfile(userId),
       ]);
+      final remoteEdits = await _remote.fetchPersonalSongEdits(
+        since: metadata.lastSync,
+      );
+      await _mergePersonalSongEdits(userId, remoteEdits, pending);
+      pending = await _pendingFor(userId);
 
       // Required conflict invariant: remote state is fetched before any upload.
       final remoteChanged =
@@ -177,6 +186,11 @@ class SyncService {
             applied.map((item) => item.id).toList(growable: false),
           ),
         );
+        await _mergePersonalSongEdits(
+          userId,
+          await _remote.fetchPersonalSongEdits(),
+          await _pendingFor(userId),
+        );
         final remaining = await _pendingFor(userId);
         if (remaining.isEmpty) {
           _retryTimer?.cancel();
@@ -220,7 +234,63 @@ class SyncService {
           table: 'songs',
           callback: (_) => unawaited(synchronize()),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'user_song_edits',
+          callback: (_) => unawaited(synchronize()),
+        )
         .subscribe();
+  }
+
+  Future<void> _mergePersonalSongEdits(
+    String userId,
+    List<Map<String, dynamic>> rows,
+    List<SyncQueue> pending,
+  ) async {
+    final pendingBySong = <String, List<SyncQueue>>{};
+    for (final item in pending.where(
+      (item) => item.entityType == 'user_song_edits',
+    )) {
+      pendingBySong.putIfAbsent(item.entityId, () => []).add(item);
+    }
+    for (final row in rows.where((row) => row['user_id'] == userId)) {
+      final songId = row['song_id'] as String;
+      final remoteTime = DateTime.parse(
+        row['client_updated_at'] as String,
+      ).toUtc();
+      final local = await _isar.personalSongEditRecords
+          .filter()
+          .cacheKeyEqualTo('$userId:$songId')
+          .findFirst();
+      final queued = pendingBySong[songId] ?? const <SyncQueue>[];
+      final winner = PersonalSongEditConflictResolver.resolve(
+        localUpdatedAt: local?.clientUpdatedAt,
+        remoteUpdatedAt: remoteTime,
+        hasPendingLocalMutation: queued.isNotEmpty,
+      );
+      if (winner == PersonalSongEditConflictWinner.local) {
+        continue;
+      }
+      final record = local ?? PersonalSongEditRecord()
+        ..cacheKey = '$userId:$songId'
+        ..userId = userId
+        ..songId = songId;
+      record
+        ..editId = row['id'] as String
+        ..lyrics = row['lyrics'] as String
+        ..clientUpdatedAt = remoteTime
+        ..serverUpdatedAt = DateTime.parse(row['updated_at'] as String).toUtc()
+        ..deleted = row['deleted'] as bool? ?? false;
+      await _isar.writeTxn(() async {
+        await _isar.personalSongEditRecords.put(record);
+        if (queued.isNotEmpty) {
+          await _isar.syncQueues.deleteAll(
+            queued.map((item) => item.id).toList(growable: false),
+          );
+        }
+      });
+    }
   }
 
   Future<SyncMetadata> _metadataFor(String userId) async =>

@@ -11,6 +11,8 @@ import '../../../../shared/models/song_column.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
+import '../../../songs/data/isar_personal_song_edit_repository.dart';
+import '../../../songs/presentation/pages/personal_song_edit_page.dart';
 import '../../application/board_detail_controller.dart';
 import '../../data/board_repository.dart';
 import '../../domain/board_filter.dart';
@@ -342,6 +344,32 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
             _songList = _songList.copyWith(columns: columns);
           });
         },
+      ),
+    );
+  }
+
+  void _editPersonalSong(Song song) {
+    final repository = ref.read(personalSongEditRepositoryProvider);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => PersonalSongEditPage(
+        song: song,
+        onSave: (lyrics) async {
+          await repository.save(songId: song.id, lyrics: lyrics);
+          if (mounted) {
+            AppSnackbar.showSuccess(context, 'Personal version saved');
+          }
+        },
+        onReset: !song.hasPersonalEdit
+            ? null
+            : () async {
+                await repository.remove(song.id);
+                if (mounted) {
+                  AppSnackbar.showSuccess(context, 'Admin lyrics restored');
+                }
+              },
       ),
     );
   }
@@ -1168,6 +1196,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                                   : (song) => unawaited(
                                       _showMoveSongSheet(song, column.id),
                                     ),
+                              onPersonalEdit: _editPersonalSong,
                               onReorderSongs: !canReorder
                                   ? null
                                   : (oldIndex, newIndex) => unawaited(

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar/isar.dart';
 import 'package:my_app/database/local/models/cached_board.dart';
+import 'package:my_app/database/local/models/personal_song_edit.dart';
 import 'package:my_app/database/local/models/sync_queue.dart';
 import 'package:my_app/features/boards/data/board_codec.dart';
 import 'package:my_app/features/boards/data/offline_board_repository.dart';
@@ -96,6 +97,49 @@ void main() {
       expect(syncRequests, 1);
     },
   );
+
+  test('personal lyrics overlay never mutates cached admin song', () async {
+    final row = (await isar.cachedBoards.where().findAll()).single;
+    final board = BoardCodec.decode(row.document);
+    final column = board.columns.first;
+    final adminSong = column.songs.first.copyWith(
+      creatorType: SongCreatorType.admin,
+      canEdit: false,
+      lyrics: 'Admin lyrics',
+    );
+    row.document = BoardCodec.encode(
+      board.copyWith(
+        columns: [
+          column.copyWith(songs: [adminSong, ...column.songs.skip(1)]),
+          ...board.columns.skip(1),
+        ],
+      ),
+    );
+    final edit = PersonalSongEditRecord()
+      ..cacheKey = 'user:one'
+      ..userId = 'user'
+      ..songId = 'one'
+      ..editId = 'edit'
+      ..lyrics = 'Personal lyrics\n[My note]'
+      ..clientUpdatedAt = DateTime.utc(2026, 8, 4);
+    await isar.writeTxn(() async {
+      await isar.cachedBoards.put(row);
+      await isar.personalSongEditRecords.put(edit);
+    });
+
+    final displayed = await _repository(isar).fetchBoard('board');
+    expect(
+      displayed.columns.first.songs.first.displayedLyrics,
+      contains('[My note]'),
+    );
+    expect(displayed.columns.first.songs.first.hasPersonalEdit, isTrue);
+
+    final cached = BoardCodec.decode(
+      (await isar.cachedBoards.where().findAll()).single.document,
+    );
+    expect(cached.columns.first.songs.first.lyrics, 'Admin lyrics');
+    expect(cached.columns.first.songs.first.hasPersonalEdit, isFalse);
+  });
 }
 
 Future<void> _initializeIsarCore() async {
@@ -121,7 +165,7 @@ Future<void> _initializeIsarCore() async {
 }
 
 Future<Isar> _openIsar(String directory, String name) => Isar.open(
-  [CachedBoardSchema, SyncQueueSchema],
+  [CachedBoardSchema, SyncQueueSchema, PersonalSongEditRecordSchema],
   directory: directory,
   name: name,
 );

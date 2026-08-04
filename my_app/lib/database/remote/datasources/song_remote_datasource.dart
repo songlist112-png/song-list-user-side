@@ -46,6 +46,21 @@ class SyncRemoteDataSource {
 
   Future<List<dynamic>> fetchBoardGraph() => _reader.fetchBoards();
 
+  Future<List<Map<String, dynamic>>> fetchPersonalSongEdits({
+    DateTime? since,
+  }) async {
+    final response = since == null
+        ? await _client.from('user_song_edits').select().order('updated_at')
+        : await _client
+              .from('user_song_edits')
+              .select()
+              .gt('updated_at', since.toUtc().toIso8601String())
+              .order('updated_at');
+    return (response as List)
+        .map((row) => (row as Map).cast<String, dynamic>())
+        .toList(growable: false);
+  }
+
   Future<Uint8List> downloadAttachment(String storagePath) =>
       _client.storage.from('attachments').download(storagePath);
 
@@ -53,6 +68,19 @@ class SyncRemoteDataSource {
     final payload = item.payload == null
         ? <String, dynamic>{}
         : (jsonDecode(item.payload!) as Map).cast<String, dynamic>();
+    if (item.entityType == 'user_song_edits') {
+      await _client.rpc<Object?>(
+        'sync_upsert_user_song_edit',
+        params: {
+          'p_id': payload['id'],
+          'p_song_id': payload['song_id'],
+          'p_lyrics': payload['lyrics'],
+          'p_client_updated_at': payload['client_updated_at'],
+          'p_deleted': payload['deleted'],
+        },
+      );
+      return;
+    }
     if (item.operation == 'delete') {
       await _client
           .from(item.entityType)

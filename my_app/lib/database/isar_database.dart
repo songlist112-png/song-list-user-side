@@ -2,6 +2,7 @@ import 'package:isar/isar.dart';
 import 'package:my_app/database/local/models/attachment.dart';
 import 'package:my_app/database/local/models/cached_board.dart';
 import 'package:my_app/database/local/models/profile.dart';
+import 'package:my_app/database/local/models/personal_song_edit.dart';
 import 'package:my_app/database/local/models/song.dart';
 import 'package:my_app/database/local/models/subscription.dart';
 import 'package:my_app/database/local/models/sync_queue.dart';
@@ -24,6 +25,7 @@ class IsarDatabase {
       SyncQueueSchema,
       SyncMetadataSchema,
       CachedBoardSchema,
+      PersonalSongEditRecordSchema,
     ], directory: dir.path);
     _initialized = true;
   }

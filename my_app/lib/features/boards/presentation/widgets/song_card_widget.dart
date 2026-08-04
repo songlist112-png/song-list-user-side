@@ -14,6 +14,7 @@ class SongCardWidget extends StatelessWidget {
   final int? reorderIndex;
   final VoidCallback? onTap;
   final VoidCallback? onMove;
+  final VoidCallback? onPersonalEdit;
   final List<Label> availableLabels;
 
   const SongCardWidget({
@@ -26,6 +27,7 @@ class SongCardWidget extends StatelessWidget {
     this.reorderIndex,
     this.onTap,
     this.onMove,
+    this.onPersonalEdit,
     this.availableLabels = const [],
   });
 
@@ -70,6 +72,20 @@ class SongCardWidget extends StatelessWidget {
                       color: AppColors.textMuted,
                     ),
                   ),
+                if (onPersonalEdit != null)
+                  IconButton(
+                    tooltip: song.hasPersonalEdit
+                        ? 'Edit personal lyrics and notes'
+                        : 'Create personal lyrics and notes',
+                    onPressed: onPersonalEdit,
+                    icon: Icon(
+                      song.hasPersonalEdit
+                          ? Icons.edit_note
+                          : Icons.note_add_outlined,
+                      size: 20,
+                      color: AppColors.accent,
+                    ),
+                  ),
                 if (isReorderable) _DragHandle(reorderIndex: reorderIndex),
               ],
             ),
@@ -90,6 +106,12 @@ class SongCardWidget extends StatelessWidget {
                         : Colors.green.shade600,
                     textColor: Colors.white,
                   ),
+                  if (song.hasPersonalEdit)
+                    const AppChip(
+                      label: 'Personal edit',
+                      backgroundColor: AppColors.accent,
+                      textColor: Colors.white,
+                    ),
                   if (song.key != null && song.key!.isNotEmpty)
                     AppChip(label: song.keyDisplay),
                   if (showArtist &&
@@ -121,17 +143,21 @@ class SongCardWidget extends StatelessWidget {
             ],
 
             // Lyrics section (expanded)
-            if (isExpanded && song.lyrics != null) ...[
+            if (isExpanded && song.displayedLyrics != null) ...[
               const SizedBox(height: 12),
               const Divider(color: AppColors.border, height: 1),
               const SizedBox(height: 12),
               Row(
-                children: const [
-                  Icon(Icons.lyrics, size: 14, color: AppColors.textMuted),
-                  SizedBox(width: 6),
+                children: [
+                  const Icon(
+                    Icons.lyrics,
+                    size: 14,
+                    color: AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    'Lyrics',
-                    style: TextStyle(
+                    song.hasPersonalEdit ? 'Personal lyrics & notes' : 'Lyrics',
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textMuted,
@@ -141,7 +167,7 @@ class SongCardWidget extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                song.lyrics!,
+                song.displayedLyrics!,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.text,
