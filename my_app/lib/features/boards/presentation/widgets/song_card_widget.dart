@@ -4,6 +4,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_chip.dart';
 import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
+import '../../../songs/presentation/widgets/personal_lyrics_text.dart';
 
 class SongCardWidget extends StatelessWidget {
   final Song song;
@@ -83,7 +84,9 @@ class SongCardWidget extends StatelessWidget {
                           ? Icons.edit_note
                           : Icons.note_add_outlined,
                       size: 20,
-                      color: AppColors.accent,
+                      color: song.hasPersonalEdit
+                          ? AppColors.personalEdit
+                          : AppColors.accent,
                     ),
                   ),
                 if (isReorderable) _DragHandle(reorderIndex: reorderIndex),
@@ -109,7 +112,7 @@ class SongCardWidget extends StatelessWidget {
                   if (song.hasPersonalEdit)
                     const AppChip(
                       label: 'Personal edit',
-                      backgroundColor: AppColors.accent,
+                      backgroundColor: AppColors.personalEdit,
                       textColor: Colors.white,
                     ),
                   if (song.key != null && song.key!.isNotEmpty)
@@ -149,31 +152,41 @@ class SongCardWidget extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.lyrics,
                     size: 14,
-                    color: AppColors.textMuted,
+                    color: song.hasPersonalEdit
+                        ? AppColors.personalEdit
+                        : AppColors.textMuted,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     song.hasPersonalEdit ? 'Personal lyrics & notes' : 'Lyrics',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textMuted,
+                      color: song.hasPersonalEdit
+                          ? AppColors.personalEdit
+                          : AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                song.displayedLyrics!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.text,
-                  height: 1.5,
+              if (song.hasPersonalEdit)
+                PersonalLyricsText(
+                  originalLyrics: song.lyrics ?? '',
+                  personalLyrics: song.personalLyrics!,
+                )
+              else
+                Text(
+                  song.lyrics!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.black,
+                    height: 1.5,
+                  ),
                 ),
-              ),
             ],
           ],
         ),

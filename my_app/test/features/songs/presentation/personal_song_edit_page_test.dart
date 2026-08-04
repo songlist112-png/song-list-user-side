@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:my_app/app/theme/app_colors.dart';
 import 'package:my_app/features/songs/presentation/pages/personal_song_edit_page.dart';
 import 'package:my_app/shared/models/song.dart';
 
@@ -29,6 +30,18 @@ void main() {
       findsOneWidget,
     );
     await tester.enterText(find.byType(TextField), 'My lyrics\n[private note]');
+    final field = tester.widget<TextField>(find.byType(TextField));
+    final context = tester.element(find.byType(TextField));
+    final span = field.controller!.buildTextSpan(
+      context: context,
+      style: field.style,
+      withComposing: false,
+    );
+    final lineColors = span.children!.cast<TextSpan>().map(
+      (line) => line.style?.color,
+    );
+    expect(field.style?.color, Colors.black);
+    expect(lineColors, everyElement(AppColors.personalEdit));
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 

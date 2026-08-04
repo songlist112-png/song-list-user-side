@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/models/song.dart';
+import '../controllers/personal_lyrics_editing_controller.dart';
 
 class PersonalSongEditPage extends StatefulWidget {
   const PersonalSongEditPage({
@@ -20,13 +21,14 @@ class PersonalSongEditPage extends StatefulWidget {
 }
 
 class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
-  late final TextEditingController _lyricsController;
+  late final PersonalLyricsEditingController _lyricsController;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _lyricsController = TextEditingController(
+    _lyricsController = PersonalLyricsEditingController(
+      originalLyrics: widget.song.lyrics ?? '',
       text: widget.song.displayedLyrics,
     );
   }
@@ -97,15 +99,19 @@ class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
             minLines: 14,
             maxLines: null,
             maxLength: 100000,
+            style: const TextStyle(color: Colors.black),
             decoration: InputDecoration(
               labelText: 'Your lyrics & notes',
               helperText: 'Add notes directly between lyric lines.',
               alignLabelWithHint: true,
               filled: true,
-              fillColor: AppColors.accent.withValues(alpha: 0.05),
+              fillColor: AppColors.personalEdit.withValues(alpha: 0.06),
               border: const OutlineInputBorder(),
               enabledBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+                borderSide: BorderSide(
+                  color: AppColors.personalEdit,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
