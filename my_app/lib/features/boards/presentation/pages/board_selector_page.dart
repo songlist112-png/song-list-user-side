@@ -1,14 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/sync_service.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../profile/providers/current_profile_provider.dart';
 import '../../data/board_repository.dart';
 import '../widgets/name_prompt_dialog.dart';
 
@@ -19,31 +21,65 @@ class BoardSelectorPage extends ConsumerStatefulWidget {
   ConsumerState<BoardSelectorPage> createState() => _BoardSelectorPageState();
 }
 
-class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage> {
+class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
+    with SingleTickerProviderStateMixin {
+  static const _libraryTabIndex = 0;
+  static const _mySongsTabIndex = 1;
+
   late Future<List<SongList>> _boards;
+  late final TabController _tabController;
   StreamSubscription<void>? _boardSubscription;
+  Timer? _reloadDebounce;
+  List<SongList> _visibleBoards = const [];
+  bool _hasLoaded = false;
+  int _selectedTabIndex = _libraryTabIndex;
 
   BoardRepository get _repository => ref.read(boardRepositoryProvider);
 
   @override
   void initState() {
     super.initState();
-    _boards = _repository.fetchBoards();
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(_handleTabChanged);
+    _boards = _fetchBoards();
     _boardSubscription = _repository.watchChanges().listen((_) {
-      if (mounted) _reload();
+      _reloadDebounce?.cancel();
+      _reloadDebounce = Timer(const Duration(milliseconds: 120), () {
+        if (mounted) _reload();
+      });
     });
   }
 
   @override
   void dispose() {
+    _tabController
+      ..removeListener(_handleTabChanged)
+      ..dispose();
     _boardSubscription?.cancel();
+    _reloadDebounce?.cancel();
     super.dispose();
   }
 
+  Future<List<SongList>> _fetchBoards() async {
+    try {
+      final boards = await _repository.fetchBoards();
+      _visibleBoards = boards;
+      return boards;
+    } finally {
+      _hasLoaded = true;
+    }
+  }
+
   void _reload() {
+    _reloadDebounce?.cancel();
     setState(() {
-      _boards = _repository.fetchBoards();
+      _boards = _fetchBoards();
     });
+  }
+
+  void _handleTabChanged() {
+    if (!mounted || _selectedTabIndex == _tabController.index) return;
+    setState(() => _selectedTabIndex = _tabController.index);
   }
 
   Future<void> _createBoard() async {
@@ -95,6 +131,32 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage> {
     }
   }
 
+  Future<void> _showBoardActions(SongList board) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () => Navigator.pop(context, 'rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'rename') await _renameBoard(board);
+    if (action == 'delete') await _deleteBoard(board);
+  }
+
   Future<void> _runMutation(
     Future<Object?> Function() mutation, {
     String? successMessage,
@@ -129,78 +191,261 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(currentProfileProvider).asData?.value;
+    final canCreateBoard = profile != null && profile.role != 'admin';
+    final showCreateButton =
+        _selectedTabIndex == _mySongsTabIndex && canCreateBoard;
+
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: const Text('Venue Boards'),
-        centerTitle: true,
-        actions: [_ProfileMenu(onSignOut: _signOut)],
-      ),
-      body: FutureBuilder<List<SongList>>(
-        future: _boards,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return _LoadError(onRetry: _reload);
-          }
-          final boards = snapshot.data ?? const [];
-          return RefreshIndicator(
-            onRefresh: () async {
-              _reload();
-              await _boards;
-            },
-            child: boards.isEmpty
-                ? const _EmptyBoards()
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: boards.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final board = boards[index];
-                      return _BoardTile(
-                        board: board,
-                        onTap: () async {
-                          await context.push('/board/${board.id}');
-                          if (mounted) _reload();
+      backgroundColor: AppColors.bgDark,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _WelcomeHeader(onSignOut: _signOut),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF4F4F4),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    _BoardTabs(controller: _tabController),
+                    Expanded(
+                      child: FutureBuilder<List<SongList>>(
+                        future: _boards,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState !=
+                                  ConnectionState.done &&
+                              !_hasLoaded) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError && !_hasLoaded) {
+                            return _LoadError(onRetry: _reload);
+                          }
+
+                          final boards = snapshot.data ?? _visibleBoards;
+
+                          final libraryBoards = boards
+                              .where(
+                                (board) =>
+                                    board.creatorType == BoardCreatorType.admin,
+                              )
+                              .toList(growable: false);
+
+                          final userBoards = boards
+                              .where(
+                                (board) =>
+                                    board.creatorType == BoardCreatorType.user,
+                              )
+                              .toList(growable: false);
+
+                          return TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _BoardList(
+                                boards: libraryBoards,
+                                emptyMessage: 'No library songs available',
+                                onRefresh: _refreshBoards,
+                                onOpen: _openBoard,
+                              ),
+                              _BoardList(
+                                boards: userBoards,
+                                emptyMessage: 'No songs created yet',
+                                onRefresh: _refreshBoards,
+                                onOpen: _openBoard,
+                                onLongPress: _showBoardActions,
+                              ),
+                            ],
+                          );
                         },
-                        onRename: board.canEdit
-                            ? () => _renameBoard(board)
-                            : null,
-                        onDelete: board.canEdit
-                            ? () => _deleteBoard(board)
-                            : null,
-                      );
-                    },
-                  ),
-          );
-        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.all(16),
-        child: ElevatedButton.icon(
-          onPressed: _createBoard,
-          icon: const Icon(Icons.add),
-          label: const Text('Create New Board'),
+      floatingActionButton: showCreateButton
+          ? FloatingActionButton(
+              onPressed: _createBoard,
+              tooltip: 'Create a new song list',
+              backgroundColor: const Color(0xFF062A68),
+              foregroundColor: Colors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, size: 30),
+            )
+          : null,
+    );
+  }
+
+  Future<void> _refreshBoards() async {
+    _reload();
+    await _boards;
+  }
+
+  Future<void> _openBoard(SongList board) async {
+    await context.push('/board/${board.id}');
+    if (mounted) _reload();
+  }
+}
+
+class _WelcomeHeader extends ConsumerWidget {
+  const _WelcomeHeader({required this.onSignOut});
+
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // final profile = ref.watch(currentProfileProvider).asData?.value;
+    // final fullName = profile?.fullName?.trim();
+    // final email = profile?.email ?? '';
+    // final displayName = fullName != null && fullName.isNotEmpty
+    //     ? fullName
+    //     : email.isNotEmpty
+    //     ? email.split('@').first
+    //     : 'Song List user';
+
+    return SizedBox(
+      height: 132,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 12, 28),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Venue Boards',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                  // const SizedBox(height: 2),
+                  // Text(
+                  //   displayName,
+                  //   maxLines: 1,
+                  //   overflow: TextOverflow.ellipsis,
+                  //   style: const TextStyle(color: Colors.white, fontSize: 16),
+                  // ),
+                ],
+              ),
+            ),
+            _ProfileMenu(onSignOut: onSignOut),
+          ],
         ),
       ),
     );
   }
 }
 
+class _BoardTabs extends StatelessWidget {
+  const _BoardTabs({required this.controller});
+
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 80,
+    child: TabBar(
+      controller: controller,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      indicatorColor: AppColors.accent,
+      indicatorSize: TabBarIndicatorSize.label,
+      indicatorWeight: 3,
+      dividerColor: Colors.transparent,
+      labelColor: Colors.black,
+      unselectedLabelColor: Colors.black,
+      labelStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+      tabs: const [
+        Tab(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.library_music_rounded),
+              SizedBox(width: 8),
+              Text('Boards'),
+            ],
+          ),
+        ),
+        Tab(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.queue_music_rounded),
+              SizedBox(width: 8),
+              Text('My Boards'),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BoardList extends StatelessWidget {
+  const _BoardList({
+    required this.boards,
+    required this.emptyMessage,
+    required this.onRefresh,
+    required this.onOpen,
+    this.onLongPress,
+  });
+
+  final List<SongList> boards;
+  final String emptyMessage;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function(SongList board) onOpen;
+  final Future<void> Function(SongList board)? onLongPress;
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: boards.isEmpty
+        ? _EmptyBoards(message: emptyMessage)
+        : ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 96),
+            itemCount: boards.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final board = boards[index];
+              return _BoardTile(
+                board: board,
+                onTap: () => onOpen(board),
+                onLongPress: board.canEdit && onLongPress != null
+                    ? () => onLongPress!(board)
+                    : null,
+              );
+            },
+          ),
+  );
+}
+
 class _BoardTile extends StatelessWidget {
   const _BoardTile({
     required this.board,
     required this.onTap,
-    this.onRename,
-    this.onDelete,
+    this.onLongPress,
   });
 
   final SongList board;
   final VoidCallback onTap;
-  final VoidCallback? onRename;
-  final VoidCallback? onDelete;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -209,111 +454,75 @@ class _BoardTile extends StatelessWidget {
       (total, column) => total + column.songs.length,
     );
     return Card(
+      elevation: 3,
+      shadowColor: Colors.black45,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onTap,
-        leading: const Icon(Icons.library_music, color: AppColors.accent),
-        title: Row(
-          children: [
-            Expanded(child: Text(board.name)),
-            const SizedBox(width: 8),
-            _BoardCreatorBadge(board: board),
-          ],
+        onLongPress: onLongPress,
+        minTileHeight: 72,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: const Icon(
+          Icons.music_note_rounded,
+          color: Colors.black,
+          size: 30,
         ),
-        subtitle: Text('${board.columns.length} lists · $songCount songs'),
-        trailing: onDelete == null
-            ? const Icon(Icons.chevron_right)
-            : PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'rename') onRename?.call();
-                  if (value == 'delete') onDelete?.call();
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'rename', child: Text('Rename')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-              ),
+        title: Text(
+          board.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w400),
+        ),
+        subtitle: Text(
+          '${board.columns.length} ${board.columns.length == 1 ? 'List' : 'Lists'}'
+          '   $songCount ${songCount == 1 ? 'Song' : 'Songs'}',
+          style: const TextStyle(fontSize: 11, color: Colors.black54),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: Colors.black,
+          size: 28,
+        ),
       ),
     );
   }
 }
 
-class _BoardCreatorBadge extends StatelessWidget {
-  const _BoardCreatorBadge({required this.board});
-
-  final SongList board;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isUserCreated = board.creatorType == BoardCreatorType.user;
-
-    final bool isReadOnly = !isUserCreated && !board.canEdit;
-
-    late final Color color;
-    late final IconData icon;
-    late final String text;
-
-    if (isUserCreated) {
-      color = Colors.green;
-      icon = Icons.person_rounded;
-      text = 'Mine';
-    } else if (isReadOnly) {
-      color = Colors.orange;
-      icon = Icons.lock_outline_rounded;
-      text = 'Read Only';
-    } else {
-      color = AppColors.accent;
-      icon = Icons.verified_user_rounded;
-      text = 'Official';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withValues(alpha: .28)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileMenu extends StatelessWidget {
+class _ProfileMenu extends ConsumerWidget {
   const _ProfileMenu({required this.onSignOut});
 
   final Future<void> Function() onSignOut;
 
   @override
-  Widget build(BuildContext context) {
-    final user = Supabase.instance.client.auth.currentUser;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentProfileProvider).asData?.value;
+    final fullName = profile?.fullName?.trim();
+    final email = profile?.email ?? '';
+    final displayName = fullName != null && fullName.isNotEmpty
+        ? fullName
+        : email.isNotEmpty
+        ? email.split('@').first
+        : 'User';
+    final avatarPath = profile?.avatarLocalPath;
+    final avatarFile = avatarPath == null ? null : File(avatarPath);
+    final hasCachedAvatar = avatarFile?.existsSync() ?? false;
+    final ImageProvider<Object>? avatarImage = hasCachedAvatar
+        ? FileImage(avatarFile!)
+        : null;
 
-    final metadata = user?.userMetadata ?? {};
-
-    final avatarUrl = metadata['avatar_url'] as String?;
-
-    final displayName =
-        (metadata['full_name'] ??
-                metadata['name'] ??
-                user?.email?.split('@').first ??
-                'User')
-            .toString();
-
-    final email = user?.email ?? '';
+    if (!hasCachedAvatar && profile?.avatarUrl?.isNotEmpty == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(
+          ref.read(syncServiceProvider).cacheProfileAvatar(profile!).catchError(
+            (Object error) {
+              debugPrint('Avatar cache failed: $error');
+              return null;
+            },
+          ),
+        );
+      });
+    }
 
     return PopupMenuButton<String>(
       onSelected: (value) {
@@ -340,12 +549,12 @@ class _ProfileMenu extends StatelessWidget {
           ],
         ),
         child: CircleAvatar(
-          radius: 18,
+          radius: 20,
           backgroundColor: Theme.of(
             context,
           ).colorScheme.surfaceContainerHighest,
-          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-          child: avatarUrl == null
+          backgroundImage: avatarImage,
+          child: avatarImage == null
               ? Text(
                   displayName[0].toUpperCase(),
                   style: const TextStyle(fontWeight: FontWeight.bold),
@@ -391,18 +600,23 @@ class _ProfileMenu extends StatelessWidget {
 }
 
 class _EmptyBoards extends StatelessWidget {
-  const _EmptyBoards();
+  const _EmptyBoards({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) => ListView(
-    children: const [
-      SizedBox(height: 180),
-      Icon(Icons.library_music_outlined, size: 64, color: Colors.white54),
-      SizedBox(height: 16),
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    children: [
+      const SizedBox(height: 150),
+      const Icon(Icons.library_music_outlined, size: 58, color: Colors.black26),
+      const SizedBox(height: 14),
       Center(
         child: Text(
-          'No boards available',
-          style: TextStyle(color: Colors.white70, fontSize: 18),
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.black45, fontSize: 16),
         ),
       ),
     ],

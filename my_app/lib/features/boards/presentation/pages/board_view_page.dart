@@ -14,6 +14,7 @@ import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../application/board_detail_controller.dart';
 import '../../data/board_repository.dart';
 import '../../domain/board_filter.dart';
+import '../../domain/song_reorder.dart';
 import '../providers/search_history_provider.dart';
 import '../widgets/add_column_button.dart';
 import '../widgets/key_filter_bar.dart';
@@ -50,7 +51,10 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   String _searchQuery = '';
   List<String> _searchSuggestions = [];
   Timer? _debounceTimer;
+  Timer? _boardReloadDebounce;
   StreamSubscription<void>? _boardSubscription;
+  int _pendingReorders = 0;
+  int _localBoardRevision = 0;
 
   BoardRepository get _repository => ref.read(boardRepositoryProvider);
 
@@ -66,7 +70,12 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     );
     _loadBoard();
     _boardSubscription = _repository.watchChanges().listen((_) {
-      if (mounted) unawaited(_loadBoard());
+      _boardReloadDebounce?.cancel();
+      _boardReloadDebounce = Timer(const Duration(milliseconds: 120), () {
+        if (mounted && _pendingReorders == 0) {
+          unawaited(_loadBoard(showLoading: false));
+        }
+      });
     });
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode.addListener(() {
@@ -79,24 +88,34 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _boardReloadDebounce?.cancel();
     _boardSubscription?.cancel();
     _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadBoard() async {
-    setState(() {
-      _isLoading = true;
-      _loadError = null;
-    });
+  Future<void> _loadBoard({bool showLoading = true}) async {
+    final revision = _localBoardRevision;
+    if (showLoading) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
     try {
       final board = await _repository.fetchBoard(widget.boardId);
-      if (mounted) setState(() => _songList = board);
+      if (mounted && _pendingReorders == 0 && revision == _localBoardRevision) {
+        setState(() => _songList = board);
+      }
     } on Exception catch (error) {
-      if (mounted) setState(() => _loadError = error);
+      if (showLoading) {
+        if (mounted) setState(() => _loadError = error);
+      } else {
+        debugPrint('Silent board refresh failed: $error');
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (showLoading && mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -327,14 +346,15 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     );
   }
 
-  void _reorderSongs(String columnId, int oldIndex, int newIndex) {
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
+  Future<void> _reorderSongs(
+    String columnId,
+    int oldIndex,
+    int newIndex,
+  ) async {
     final column = _songList.columns.firstWhere((item) => item.id == columnId);
-    final songs = List<Song>.from(column.songs);
-    final song = songs.removeAt(oldIndex);
-    songs.insert(newIndex, song);
+    final songs = reorderSongsByIndex(column.songs, oldIndex, newIndex);
+    _pendingReorders++;
+    _localBoardRevision++;
     setState(() {
       final columns = _songList.columns
           .map(
@@ -343,9 +363,105 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           .toList();
       _songList = _songList.copyWith(columns: columns);
     });
-    _repository.reorderSongs(songs).catchError((Object error) {
+    try {
+      await _repository.reorderSongs(songs);
+    } catch (error) {
       if (mounted) _showError(error);
+    } finally {
+      _pendingReorders--;
+      if (mounted && _pendingReorders == 0) {
+        await _loadBoard(showLoading: false);
+      }
+    }
+  }
+
+  Future<void> _showMoveSongSheet(Song song, String sourceColumnId) async {
+    final destinations = _songList.columns
+        .where(
+          (column) =>
+              column.id != sourceColumnId &&
+              column.songs.every((item) => item.canEdit),
+        )
+        .toList(growable: false);
+    if (destinations.isEmpty) {
+      _showError(StateError('Create another personal column before moving'));
+      return;
+    }
+
+    final destinationColumnId = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: AppColors.bgCard,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Move song to'),
+              subtitle: Text('Choose personal destination column'),
+            ),
+            ...destinations.map(
+              (column) => ListTile(
+                leading: const Icon(Icons.view_column_outlined),
+                title: Text(column.title),
+                subtitle: Text('${column.songs.length} songs'),
+                onTap: () => Navigator.pop(context, column.id),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (destinationColumnId == null || !mounted) return;
+    await _moveSong(song.id, destinationColumnId);
+  }
+
+  Future<void> _moveSong(String songId, String destinationColumnId) async {
+    final sourceColumn = _songList.columns.firstWhere(
+      (column) => column.songs.any((song) => song.id == songId),
+    );
+    final destinationColumn = _songList.columns.firstWhere(
+      (column) => column.id == destinationColumnId,
+    );
+    final song = sourceColumn.songs.firstWhere((item) => item.id == songId);
+    if (!song.canEdit ||
+        sourceColumn.songs.any((item) => !item.canEdit) ||
+        destinationColumn.songs.any((item) => !item.canEdit)) {
+      _showError(StateError('Only personal songs can be moved'));
+      return;
+    }
+
+    _pendingReorders++;
+    _localBoardRevision++;
+    setState(() {
+      _songList = _songList.copyWith(
+        columns: _songList.columns
+            .map(
+              (column) => switch (column.id) {
+                final id when id == sourceColumn.id => column.copyWith(
+                  songs: column.songs
+                      .where((item) => item.id != songId)
+                      .toList(growable: false),
+                ),
+                final id when id == destinationColumn.id => column.copyWith(
+                  songs: [...column.songs, song],
+                ),
+                _ => column,
+              },
+            )
+            .toList(growable: false),
+      );
     });
+    try {
+      await _repository.moveSong(songId, destinationColumnId);
+    } catch (error) {
+      if (mounted) _showError(error);
+    } finally {
+      _pendingReorders--;
+      if (mounted && _pendingReorders == 0) {
+        await _loadBoard(showLoading: false);
+      }
+    }
   }
 
   Future<bool> _saveBoard(SongList board) async {
@@ -383,6 +499,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
       useSafeArea: true, // ADD THIS - keeps content away from status bar
       backgroundColor: AppColors.bgCard,
       builder: (_) => MenuBottomSheet(
+        readOnly: !_songList.canEdit,
         showArtist: _songList.showArtist,
         showBpm: _songList.showBpm,
         darkMode: _songList.darkMode,
@@ -826,6 +943,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         _activeAccidental != null ||
         _searchQuery.isNotEmpty;
     final canMutate = _songList.canEdit && (!_isViewMode || _isEditMode);
+    final canReorder = !hasFilters && canMutate;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -878,11 +996,10 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                   onPressed: _showSearch,
                 ),
                 // Menu (three dots)
-                if (_songList.canEdit)
-                  IconButton(
-                    icon: const Icon(Icons.more_vert, size: 22),
-                    onPressed: _showMenu,
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert, size: 22),
+                  onPressed: _showMenu,
+                ),
                 // Toggle between Edit and View icons
                 if (_songList.canEdit)
                   IconButton(
@@ -1046,12 +1163,19 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                                         _editSong(song, column.id);
                                       }
                                     },
-                              onReorderSongs: hasFilters || !canMutate
+                              onMoveSong: !canMutate
                                   ? null
-                                  : (oldIndex, newIndex) => _reorderSongs(
-                                      column.id,
-                                      oldIndex,
-                                      newIndex,
+                                  : (song) => unawaited(
+                                      _showMoveSongSheet(song, column.id),
+                                    ),
+                              onReorderSongs: !canReorder
+                                  ? null
+                                  : (oldIndex, newIndex) => unawaited(
+                                      _reorderSongs(
+                                        column.id,
+                                        oldIndex,
+                                        newIndex,
+                                      ),
                                     ),
                             ),
                           );
