@@ -11,7 +11,9 @@ class SongCardWidget extends StatelessWidget {
   final bool showBpm;
   final bool isExpanded;
   final bool isReorderable;
+  final int? reorderIndex;
   final VoidCallback? onTap;
+  final VoidCallback? onMove;
   final List<Label> availableLabels;
 
   const SongCardWidget({
@@ -21,7 +23,9 @@ class SongCardWidget extends StatelessWidget {
     this.showBpm = false,
     this.isExpanded = false,
     this.isReorderable = false,
+    this.reorderIndex,
     this.onTap,
+    this.onMove,
     this.availableLabels = const [],
   });
 
@@ -56,15 +60,17 @@ class SongCardWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (isReorderable)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 8),
-                    child: Icon(
-                      Icons.drag_indicator,
-                      size: 16,
+                if (onMove != null)
+                  IconButton(
+                    tooltip: 'Move song',
+                    onPressed: onMove,
+                    icon: const Icon(
+                      Icons.drive_file_move_outlined,
+                      size: 20,
                       color: AppColors.textMuted,
                     ),
                   ),
+                if (isReorderable) _DragHandle(reorderIndex: reorderIndex),
               ],
             ),
 
@@ -175,5 +181,34 @@ class SongCardWidget extends StatelessWidget {
         })
         .whereType<Label>()
         .toList();
+  }
+}
+
+class _DragHandle extends StatelessWidget {
+  const _DragHandle({required this.reorderIndex});
+
+  final int? reorderIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    const icon = Icon(
+      Icons.drag_indicator,
+      size: 20,
+      color: AppColors.textMuted,
+    );
+    final index = reorderIndex;
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: index == null
+          ? icon
+          : ReorderableDragStartListener(
+              index: index,
+              child: const SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(child: icon),
+              ),
+            ),
+    );
   }
 }

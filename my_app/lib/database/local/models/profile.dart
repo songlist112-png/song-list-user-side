@@ -6,7 +6,7 @@ part 'profile.g.dart';
 class Profile {
   Id id = Isar.autoIncrement;
 
-  @Index(unique: true)
+  @Index(unique: true, replace: true)
   late String userId;
 
   String? fullName;
@@ -14,6 +14,9 @@ class Profile {
   String? email;
 
   String? avatarUrl;
+
+  /// Local-only cached avatar file. Never uploaded as a profile column.
+  String? avatarLocalPath;
 
   late String role;
 

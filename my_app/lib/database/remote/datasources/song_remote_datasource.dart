@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../features/boards/data/board_repository.dart';
+import '../../../shared/utils/media_type.dart';
 import '../../local/models/sync_queue.dart';
 
 /// Sole data-network boundary used by background synchronization.
@@ -16,9 +17,24 @@ class SyncRemoteDataSource {
   final SupabaseClient _client;
   final SupabaseBoardRepository _reader;
 
+  static const _serverTimeRetryDelays = <Duration>[
+    Duration(milliseconds: 500),
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+  ];
+
   Future<DateTime> serverTime() async {
-    final value = await _client.rpc<Object>('sync_server_time');
-    return DateTime.parse(value as String).toUtc();
+    for (var attempt = 0; ; attempt++) {
+      try {
+        final value = await _client.rpc<Object>('sync_server_time');
+        return DateTime.parse(value as String).toUtc();
+      } on PostgrestException catch (error) {
+        final statusCode = int.tryParse(error.code ?? '');
+        final retryable = statusCode != null && statusCode >= 500;
+        if (!retryable || attempt == _serverTimeRetryDelays.length) rethrow;
+        await Future<void>.delayed(_serverTimeRetryDelays[attempt]);
+      }
+    }
   }
 
   Future<bool> hasChangesSince(DateTime since) async {
@@ -46,12 +62,25 @@ class SyncRemoteDataSource {
     }
     if (item.operation == 'reorder') {
       final ids = (payload['ids'] as List).cast<String>();
-      for (final entry in ids.indexed) {
-        await _client
-            .from('songs')
-            .update({'position': entry.$1})
-            .eq('id', entry.$2);
-      }
+      await _applyPersonalSongOrder(
+        columnId: payload['column_id'] as String,
+        ids: ids,
+      );
+      return;
+    }
+    if (item.operation == 'move') {
+      await _client.rpc<void>(
+        'sync_move_song',
+        params: {
+          'p_song_id': payload['song_id'] as String,
+          'p_source_column_id': payload['source_column_id'] as String,
+          'p_destination_column_id': payload['destination_column_id'] as String,
+          'p_source_song_ids': (payload['source_song_ids'] as List)
+              .cast<String>(),
+          'p_destination_song_ids': (payload['destination_song_ids'] as List)
+              .cast<String>(),
+        },
+      );
       return;
     }
     if (item.entityType == 'songs') {
@@ -61,6 +90,28 @@ class SyncRemoteDataSource {
     final row = Map<String, dynamic>.from(payload)
       ..removeWhere((_, value) => value == null);
     await _client.from(item.entityType).upsert(row, onConflict: 'id');
+  }
+
+  Future<void> _applyPersonalSongOrder({
+    required String columnId,
+    required List<String> ids,
+  }) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'sync_reorder_songs',
+      params: {'p_column_id': columnId, 'p_song_ids': ids},
+    );
+    final confirmedIds = response.cast<String>();
+    if (!_sameOrder(confirmedIds, ids)) {
+      throw StateError('Server did not confirm song arrangement');
+    }
+  }
+
+  static bool _sameOrder(List<String> first, List<String> second) {
+    if (first.length != second.length) return false;
+    for (var index = 0; index < first.length; index++) {
+      if (first[index] != second[index]) return false;
+    }
+    return true;
   }
 
   Future<void> _upsertSong(Map<String, dynamic> payload) async {
@@ -99,11 +150,11 @@ class SyncRemoteDataSource {
       } else {
         artistId = matches.first['id'] as String;
       }
-      await _client.from('song_artists').insert({
+      await _client.from('song_artists').upsert({
         'song_id': songId,
         'artist_id': artistId,
         'role': 'primary',
-      });
+      }, onConflict: 'song_id,artist_id');
     }
 
     await _client.from('song_labels').delete().eq('song_id', songId);
@@ -157,22 +208,23 @@ class SyncRemoteDataSource {
       }
       // Stable object path and row UUID make retries idempotent.
       final storagePath = '$userId/$songId/${attachmentId}__$name';
+      final mediaType = normalizeMediaType(
+        item['file_type'] as String? ?? '',
+        fileName: item['name'] as String?,
+      );
       await _client.storage
           .from('attachments')
           .upload(
             storagePath,
             file,
-            fileOptions: FileOptions(
-              contentType: item['file_type'] as String,
-              upsert: true,
-            ),
+            fileOptions: FileOptions(contentType: mediaType, upsert: true),
           );
       await _client.from('attachments').upsert({
         'id': attachmentId,
         'song_id': songId,
         'file_url': storagePath,
         'file_name': item['name'],
-        'file_type': item['file_type'],
+        'file_type': mediaType,
         'file_size': item['file_size'],
         'created_by': userId,
         'deleted': false,

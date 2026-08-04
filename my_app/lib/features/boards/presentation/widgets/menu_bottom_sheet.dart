@@ -14,6 +14,7 @@ class MenuBottomSheet extends ConsumerStatefulWidget {
   final bool darkMode;
   final List<Artist> artists;
   final List<Label> labels;
+  final bool readOnly;
   final Future<bool> Function(bool) onShowArtistChanged;
   final Future<bool> Function(bool) onShowBpmChanged;
   final Future<bool> Function(bool) onDarkModeChanged;
@@ -33,6 +34,7 @@ class MenuBottomSheet extends ConsumerStatefulWidget {
     required this.darkMode,
     required this.artists,
     required this.labels,
+    this.readOnly = false,
     required this.onShowArtistChanged,
     required this.onShowBpmChanged,
     required this.onDarkModeChanged,
@@ -72,24 +74,24 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
       backgroundColor: AppColors.bgCard,
       body: AbsorbPointer(
         absorbing: isMutating,
-          child: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 8,
-                bottom: bottomPadding,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isMutating) ...[
-                      const LinearProgressIndicator(minHeight: 2),
-                      const SizedBox(height: 12),
-                    ],
-                    // Header
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 8,
+              bottom: bottomPadding,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isMutating) ...[
+                    const LinearProgressIndicator(minHeight: 2),
+                    const SizedBox(height: 12),
+                  ],
+                  // Header
                   const SizedBox(height: 12),
                   const Center(
                     child: Text(
@@ -101,35 +103,47 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                       ),
                     ),
                   ),
+                  if (widget.readOnly) ...[
+                    const SizedBox(height: 6),
+                    const Center(
+                      child: Text(
+                        'Admin-created board · read only',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
-                  // Export / Import Section
-                  _buildSection(
-                    title: 'DATA MANAGEMENT',
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: Icons.upload_outlined,
-                            label: 'Export',
-                            onPressed: widget.onExport,
-                            isPrimary: true,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: Icons.download_outlined,
-                            label: 'Import',
-                            onPressed: widget.onImport,
-                            isPrimary: false,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // // Export / Import Section
+                  // _buildSection(
+                  //   title: 'DATA MANAGEMENT',
+                  //   child: Row(
+                  //     children: [
+                  //       Expanded(
+                  //         child: _buildActionButton(
+                  //           icon: Icons.upload_outlined,
+                  //           label: 'Export',
+                  //           onPressed: widget.onExport,
+                  //           isPrimary: true,
+                  //         ),
+                  //       ),
+                  //       const SizedBox(width: 12),
+                  //       Expanded(
+                  //         child: _buildActionButton(
+                  //           icon: Icons.download_outlined,
+                  //           label: 'Import',
+                  //           onPressed: widget.onImport,
+                  //           isPrimary: false,
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
 
-                  const SizedBox(height: 24),
+                  // const SizedBox(height: 24),
 
                   // Display Settings
                   _buildSection(
@@ -149,8 +163,10 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             title: 'Show Artist',
                             subtitle: 'Display artist names on song cards',
                             value: _showArtist,
-                            onChanged: (value) =>
-                                unawaited(_changeShowArtist(value)),
+                            onChanged: widget.readOnly
+                                ? null
+                                : (value) =>
+                                      unawaited(_changeShowArtist(value)),
                           ),
                           _buildDivider(),
                           _buildSwitchTile(
@@ -158,8 +174,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             title: 'Show BPM',
                             subtitle: 'Display tempo on song cards',
                             value: _showBpm,
-                            onChanged: (value) =>
-                                unawaited(_changeShowBpm(value)),
+                            onChanged: widget.readOnly
+                                ? null
+                                : (value) => unawaited(_changeShowBpm(value)),
                           ),
                           _buildDivider(),
                           _buildSwitchTile(
@@ -167,8 +184,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             title: 'Dark Mode',
                             subtitle: 'Use dark theme colors',
                             value: _darkMode,
-                            onChanged: (value) =>
-                                unawaited(_changeDarkMode(value)),
+                            onChanged: widget.readOnly
+                                ? null
+                                : (value) => unawaited(_changeDarkMode(value)),
                           ),
                         ],
                       ),
@@ -192,22 +210,24 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             (artist) => _buildListItem(
                               title: artist.name,
                               icon: Icons.person,
-                              onEdit: artist.canEdit
+                              onEdit: !widget.readOnly && artist.canEdit
                                   ? () => widget.onUpdateArtist(artist)
                                   : null,
-                              onDelete: artist.canEdit
+                              onDelete: !widget.readOnly && artist.canEdit
                                   ? () => unawaited(
                                       widget.onRemoveArtist(artist.id),
                                     )
                                   : null,
                             ),
                           ),
-                        const SizedBox(height: 8),
-                        _buildAddButton(
-                          label: 'Add Artist',
-                          icon: Icons.person_add_outlined,
-                          onPressed: widget.onAddArtist,
-                        ),
+                        if (!widget.readOnly) ...[
+                          const SizedBox(height: 8),
+                          _buildAddButton(
+                            label: 'Add Artist',
+                            icon: Icons.person_add_outlined,
+                            onPressed: widget.onAddArtist,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -228,22 +248,24 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                           ...widget.labels.map(
                             (label) => _buildLabelItem(
                               label: label,
-                              onEdit: label.canEdit
+                              onEdit: !widget.readOnly && label.canEdit
                                   ? () => widget.onUpdateLabel(label)
                                   : null,
-                              onDelete: label.canEdit
+                              onDelete: !widget.readOnly && label.canEdit
                                   ? () => unawaited(
                                       widget.onRemoveLabel(label.id),
                                     )
                                   : null,
                             ),
                           ),
-                        const SizedBox(height: 8),
-                        _buildAddButton(
-                          label: 'Add Label',
-                          icon: Icons.add_circle_outline,
-                          onPressed: () => widget.onAddLabel(''),
-                        ),
+                        if (!widget.readOnly) ...[
+                          const SizedBox(height: 8),
+                          _buildAddButton(
+                            label: 'Add Label',
+                            icon: Icons.add_circle_outline,
+                            onPressed: () => widget.onAddLabel(''),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -300,55 +322,55 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-    required bool isPrimary,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isPrimary ? AppColors.accent : AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isPrimary
-                ? AppColors.accent
-                : AppColors.border.withValues(alpha: 0.5),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isPrimary ? Colors.white : AppColors.text,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: isPrimary ? Colors.white : AppColors.text,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Widget _buildActionButton({
+  //   required IconData icon,
+  //   required String label,
+  //   required VoidCallback? onPressed,
+  //   required bool isPrimary,
+  // }) {
+  //   return InkWell(
+  //     onTap: onPressed,
+  //     borderRadius: BorderRadius.circular(12),
+  //     child: Container(
+  //       padding: const EdgeInsets.symmetric(vertical: 14),
+  //       decoration: BoxDecoration(
+  //         color: isPrimary ? AppColors.accent : AppColors.bgCard,
+  //         borderRadius: BorderRadius.circular(12),
+  //         border: Border.all(
+  //           color: isPrimary
+  //               ? AppColors.accent
+  //               : AppColors.border.withValues(alpha: 0.5),
+  //         ),
+  //       ),
+  //       child: Row(
+  //         mainAxisAlignment: MainAxisAlignment.center,
+  //         children: [
+  //           Icon(
+  //             icon,
+  //             size: 20,
+  //             color: isPrimary ? Colors.white : AppColors.text,
+  //           ),
+  //           const SizedBox(width: 8),
+  //           Text(
+  //             label,
+  //             style: TextStyle(
+  //               fontSize: 15,
+  //               fontWeight: FontWeight.w600,
+  //               color: isPrimary ? Colors.white : AppColors.text,
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
     required String subtitle,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<bool>? onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

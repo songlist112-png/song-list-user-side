@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -15,12 +16,14 @@ import '../../../shared/models/song.dart';
 import '../../../shared/models/song_attachment.dart';
 import '../../../shared/models/song_column.dart';
 import '../../../shared/models/song_list.dart';
+import '../../../shared/utils/media_type.dart';
 
 final boardRepositoryProvider = Provider<BoardRepository>(
   (ref) => OfflineBoardRepository(
     isar: IsarDatabase.instance,
     userId: () => Supabase.instance.client.auth.currentUser?.id,
     downloadRemoteAttachment: ref.read(syncServiceProvider).downloadAttachment,
+    onSyncNeeded: () => unawaited(ref.read(syncServiceProvider).synchronize()),
   ),
 );
 
@@ -39,6 +42,7 @@ abstract interface class BoardRepository {
   Future<void> deleteSong(String id);
   Future<Uint8List> downloadAttachment(SongAttachment attachment);
   Future<void> reorderSongs(List<Song> songs);
+  Future<void> moveSong(String songId, String destinationColumnId);
   Future<Artist> createArtist(String name);
   Future<Artist> updateArtist(Artist artist);
   Future<void> deleteArtist(String id);
@@ -206,6 +210,24 @@ class SupabaseBoardRepository implements BoardRepository {
   }
 
   @override
+  Future<void> moveSong(String songId, String destinationColumnId) async {
+    final rows = _maps(
+      await _client
+          .from('songs')
+          .select('position')
+          .eq('column_id', destinationColumnId)
+          .eq('deleted', false)
+          .order('position', ascending: false)
+          .limit(1),
+    );
+    final position = rows.isEmpty ? 0 : (rows.single['position'] as int) + 1;
+    await _client
+        .from('songs')
+        .update({'column_id': destinationColumnId, 'position': position})
+        .eq('id', songId);
+  }
+
+  @override
   Future<Artist> createArtist(String name) async {
     final userId = _requireUserId();
     final row = await _client
@@ -289,11 +311,11 @@ class SupabaseBoardRepository implements BoardRepository {
         matches.firstOrNull;
     final artistId =
         existing?['id'] as String? ?? (await createArtist(artistName)).id;
-    await _client.from('song_artists').insert({
+    await _client.from('song_artists').upsert({
       'song_id': song.id,
       'artist_id': artistId,
       'role': 'primary',
-    });
+    }, onConflict: 'song_id,artist_id');
   }
 
   Future<void> _syncSongLabels(String songId, List<String> labelIds) async {
@@ -600,7 +622,10 @@ class SupabaseBoardRepository implements BoardRepository {
           ? storedName.substring(storedName.indexOf('__') + 2)
           : storedName,
       storagePath: storagePath,
-      fileType: json['file_type'] as String,
+      fileType: normalizeMediaType(
+        json['file_type'] as String,
+        fileName: storedName,
+      ),
       fileSize: (json['file_size'] as num).toInt(),
     );
   }
@@ -653,19 +678,8 @@ class SupabaseBoardRepository implements BoardRepository {
       .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
       .replaceAll(RegExp(r'^-|-$'), '');
 
-  static String _mimeType(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    return switch (extension) {
-      'pdf' => 'application/pdf',
-      'doc' => 'application/msword',
-      'docx' =>
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'txt' => 'text/plain',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      'png' => 'image/png',
-      _ => 'application/octet-stream',
-    };
-  }
+  static String _mimeType(String fileName) =>
+      normalizeMediaType('', fileName: fileName);
 
   static String? _optionalText(Object? value) {
     final text = (value as String?)?.trim();

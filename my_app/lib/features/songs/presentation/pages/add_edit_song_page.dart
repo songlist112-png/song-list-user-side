@@ -9,6 +9,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_attachment.dart';
+import '../../../../shared/utils/media_type.dart';
 
 class AddEditSongPage extends StatefulWidget {
   final Song? existingSong;
@@ -43,15 +44,25 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
   List<String> _selectedLabelIds = [];
   static const List<String> _keys = [
     '(none)',
-    'C',
-    'D',
-    'E',
-    'F',
-    'G',
-    'A',
-    'B',
+    "C",
+    "C♯",
+    "D",
+    "Db",
+    "D#",
+    "E♭",
+    "E",
+    "F",
+    "F♯",
+    "G",
+    "Gb",
+    "G#",
+    "A♭",
+    "A",
+    "A#",
+    "B♭",
+    "B",
   ];
-  static const List<String> _keyTypes = ['Major', 'Minor'];
+  static const List<String> _keyTypes = ["Major", "Minor", "Freygish"];
 
   @override
   void initState() {
@@ -241,27 +252,27 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Container(
-                      height: 48,
-                      width: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: IconButton(
-                        onPressed: _showAddArtistDialog,
-                        icon: const Icon(
-                          Icons.add,
-                          size: 20,
-                          color: AppColors.accent,
-                        ),
-                        tooltip: 'Add new artist',
-                      ),
-                    ),
+                    // const SizedBox(width: 10),
+                    // Container(
+                    //   height: 48,
+                    //   width: 48,
+                    //   decoration: BoxDecoration(
+                    //     color: AppColors.accent.withValues(alpha: 0.1),
+                    //     borderRadius: BorderRadius.circular(12),
+                    //     border: Border.all(
+                    //       color: AppColors.accent.withValues(alpha: 0.3),
+                    //     ),
+                    //   ),
+                    //   child: IconButton(
+                    //     onPressed: _showAddArtistDialog,
+                    //     icon: const Icon(
+                    //       Icons.add,
+                    //       size: 20,
+                    //       color: AppColors.accent,
+                    //     ),
+                    //     tooltip: 'Add new artist',
+                    //   ),
+                    // ),
                   ],
                 ),
               ],
@@ -771,38 +782,38 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     );
   }
 
-  void _showAddArtistDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Artist'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Artist name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                setState(() {
-                  _selectedArtist = name;
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _showAddArtistDialog() {
+  //   final controller = TextEditingController();
+  //   showDialog(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       title: const Text('Add Artist'),
+  //       content: TextField(
+  //         controller: controller,
+  //         autofocus: true,
+  //         decoration: const InputDecoration(hintText: 'Artist name'),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(ctx),
+  //           child: const Text('Cancel'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             final name = controller.text.trim();
+  //             if (name.isNotEmpty) {
+  //               setState(() {
+  //                 _selectedArtist = name;
+  //               });
+  //             }
+  //             Navigator.pop(ctx);
+  //           },
+  //           child: const Text('Add'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Future<void> _pickFile() async {
     try {
@@ -819,7 +830,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
             SongAttachment(
               name: file.name,
               localPath: file.path,
-              fileType: file.extension ?? '',
+              fileType: normalizeMediaType(
+                file.extension ?? '',
+                fileName: file.name,
+              ),
               fileSize: file.size,
             ),
           );
