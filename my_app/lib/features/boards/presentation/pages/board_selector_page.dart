@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/services/sync_service.dart';
@@ -492,7 +493,31 @@ class _BoardTile extends StatelessWidget {
 class _ProfileMenu extends ConsumerWidget {
   const _ProfileMenu({required this.onSignOut});
 
+  static final _subscriptionUri = Uri.parse(
+    'http://172.28.112.1:3000/user-subs',
+  );
+
   final Future<void> Function() onSignOut;
+
+  Future<void> _openSubscription(BuildContext context) async {
+    try {
+      final opened = await launchUrl(
+        _subscriptionUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && context.mounted) {
+        _showLaunchError(context);
+      }
+    } on Exception {
+      if (context.mounted) _showLaunchError(context);
+    }
+  }
+
+  void _showLaunchError(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open subscription page')),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -526,7 +551,11 @@ class _ProfileMenu extends ConsumerWidget {
 
     return PopupMenuButton<String>(
       onSelected: (value) {
-        if (value == 'logout') {
+        if (value == 'subscription') {
+          unawaited(_openSubscription(context));
+        } else if (value == 'support') {
+          context.push('/support');
+        } else if (value == 'logout') {
           onSignOut();
         }
       },
@@ -584,6 +613,26 @@ class _ProfileMenu extends ConsumerWidget {
           ),
         ),
         const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'subscription',
+          child: Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined),
+              SizedBox(width: 12),
+              Text('Subscription'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'support',
+          child: Row(
+            children: [
+              Icon(Icons.help_outline_rounded),
+              SizedBox(width: 12),
+              Text('Help & Feedback'),
+            ],
+          ),
+        ),
         const PopupMenuItem(
           value: 'logout',
           child: Row(

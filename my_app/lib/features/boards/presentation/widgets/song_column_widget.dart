@@ -15,6 +15,7 @@ class SongColumnWidget extends StatefulWidget {
   final VoidCallback? onMenuTap;
   final Function(Song)? onSongTap;
   final Function(Song)? onMoveSong;
+  final Function(Song)? onPersonalEdit;
   final Function(String)? onRenameColumn;
   final Function(int, int)? onReorderSongs;
   final List<Label> availableLabels;
@@ -29,6 +30,7 @@ class SongColumnWidget extends StatefulWidget {
     this.onMenuTap,
     this.onSongTap,
     this.onMoveSong,
+    this.onPersonalEdit,
     this.onRenameColumn,
     this.onReorderSongs,
     this.availableLabels = const [],
@@ -126,6 +128,11 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                               onMove: canMoveSongs && song.canEdit
                                   ? () => widget.onMoveSong?.call(song)
                                   : null,
+                              onPersonalEdit:
+                                  widget.onPersonalEdit != null &&
+                                      song.creatorType == SongCreatorType.admin
+                                  ? () => widget.onPersonalEdit?.call(song)
+                                  : null,
                             ),
                           );
                         }).toList(),
@@ -197,6 +204,12 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                                     : () => widget.onSongTap?.call(song),
                                 onMove: canMoveSongs && song.canEdit
                                     ? () => widget.onMoveSong?.call(song)
+                                    : null,
+                                onPersonalEdit:
+                                    widget.onPersonalEdit != null &&
+                                        song.creatorType ==
+                                            SongCreatorType.admin
+                                    ? () => widget.onPersonalEdit?.call(song)
                                     : null,
                               ),
                             ),

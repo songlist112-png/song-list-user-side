@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -7,6 +8,7 @@ import 'package:isar/isar.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../database/local/models/cached_board.dart';
+import '../../../database/local/models/personal_song_edit.dart';
 import '../../../database/local/models/sync_queue.dart';
 import '../../../shared/models/artist.dart';
 import '../../../shared/models/label.dart';
@@ -46,8 +48,30 @@ class OfflineBoardRepository implements BoardRepository {
   }
 
   @override
-  Stream<void> watchChanges() =>
-      _isar.cachedBoards.filter().accountIdEqualTo(_requiredUserId).watchLazy();
+  Stream<void> watchChanges() {
+    final controller = StreamController<void>();
+    final subscriptions = <StreamSubscription<void>>[];
+    controller.onListen = () {
+      subscriptions.addAll([
+        _isar.cachedBoards
+            .filter()
+            .accountIdEqualTo(_requiredUserId)
+            .watchLazy()
+            .listen(controller.add),
+        _isar.personalSongEditRecords
+            .filter()
+            .userIdEqualTo(_requiredUserId)
+            .watchLazy()
+            .listen(controller.add),
+      ]);
+    };
+    controller.onCancel = () async {
+      for (final subscription in subscriptions) {
+        await subscription.cancel();
+      }
+    };
+    return controller.stream;
+  }
 
   @override
   Future<List<SongList>> fetchBoards() async {
@@ -55,7 +79,13 @@ class OfflineBoardRepository implements BoardRepository {
         .filter()
         .accountIdEqualTo(_requiredUserId)
         .findAll();
-    final boards = rows.map((row) => BoardCodec.decode(row.document)).toList();
+    final edits = await _personalEditsBySong();
+    final boards = rows
+        .map(
+          (row) =>
+              _overlayPersonalEdits(BoardCodec.decode(row.document), edits),
+        )
+        .toList();
     boards.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return boards;
   }
@@ -68,7 +98,10 @@ class OfflineBoardRepository implements BoardRepository {
         .cacheKeyEqualTo('$_requiredUserId:$id')
         .findFirst();
     if (row == null) throw StateError('Board not available offline');
-    return BoardCodec.decode(row.document);
+    return _overlayPersonalEdits(
+      BoardCodec.decode(row.document),
+      await _personalEditsBySong(),
+    );
   }
 
   @override
@@ -616,6 +649,41 @@ class OfflineBoardRepository implements BoardRepository {
                 ),
         )
         .toList(),
+  );
+
+  Future<Map<String, PersonalSongEditRecord>> _personalEditsBySong() async {
+    final records = await _isar.personalSongEditRecords
+        .filter()
+        .userIdEqualTo(_requiredUserId)
+        .and()
+        .deletedEqualTo(false)
+        .findAll();
+    return {for (final record in records) record.songId: record};
+  }
+
+  SongList _overlayPersonalEdits(
+    SongList board,
+    Map<String, PersonalSongEditRecord> edits,
+  ) => board.copyWith(
+    columns: board.columns
+        .map((column) {
+          return column.copyWith(
+            songs: column.songs
+                .map((song) {
+                  final edit = edits[song.id];
+                  if (edit == null ||
+                      song.creatorType != SongCreatorType.admin) {
+                    return song;
+                  }
+                  return song.copyWith(
+                    personalLyrics: edit.lyrics,
+                    personalEditUpdatedAt: edit.clientUpdatedAt,
+                  );
+                })
+                .toList(growable: false),
+          );
+        })
+        .toList(growable: false),
   );
 
   Map<String, dynamic> _boardPayload(SongList board) => {

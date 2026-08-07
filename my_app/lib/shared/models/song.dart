@@ -14,6 +14,8 @@ class Song {
   final String? keyType; // Major, Minor
   final List<String> labels;
   final String? lyrics;
+  final String? personalLyrics;
+  final DateTime? personalEditUpdatedAt;
   final List<SongAttachment> attachments;
 
   const Song({
@@ -28,6 +30,8 @@ class Song {
     this.keyType,
     this.labels = const [],
     this.lyrics,
+    this.personalLyrics,
+    this.personalEditUpdatedAt,
     this.attachments = const [],
   });
 
@@ -36,6 +40,10 @@ class Song {
     final type = keyType ?? '';
     return type.isNotEmpty ? '$key $type' : key!;
   }
+
+  String? get displayedLyrics => personalLyrics ?? lyrics;
+
+  bool get hasPersonalEdit => personalLyrics != null;
 
   Song copyWith({
     String? id,
@@ -49,6 +57,8 @@ class Song {
     String? keyType,
     List<String>? labels,
     String? lyrics,
+    String? personalLyrics,
+    DateTime? personalEditUpdatedAt,
     List<SongAttachment>? attachments,
   }) {
     return Song(
@@ -63,6 +73,9 @@ class Song {
       keyType: keyType ?? this.keyType,
       labels: labels ?? this.labels,
       lyrics: lyrics ?? this.lyrics,
+      personalLyrics: personalLyrics ?? this.personalLyrics,
+      personalEditUpdatedAt:
+          personalEditUpdatedAt ?? this.personalEditUpdatedAt,
       attachments: attachments ?? this.attachments,
     );
   }
