@@ -9,6 +9,8 @@ import 'package:my_app/database/local/models/sync_queue.dart';
 import 'package:my_app/database/local/models/sync_metadata.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../features/support/data/models/support_records.dart';
+
 class IsarDatabase {
   static late Isar instance;
   static bool _initialized = false;
@@ -26,6 +28,8 @@ class IsarDatabase {
       SyncMetadataSchema,
       CachedBoardSchema,
       PersonalSongEditRecordSchema,
+      SupportTicketRecordSchema,
+      SupportMessageRecordSchema,
     ], directory: dir.path);
     _initialized = true;
   }
