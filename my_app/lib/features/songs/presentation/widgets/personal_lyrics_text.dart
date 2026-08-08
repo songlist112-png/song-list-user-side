@@ -8,10 +8,12 @@ class PersonalLyricsText extends StatelessWidget {
     super.key,
     required this.originalLyrics,
     required this.personalLyrics,
+    this.fontSize = 13,
   });
 
   final String originalLyrics;
   final String personalLyrics;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +37,7 @@ class PersonalLyricsText extends StatelessWidget {
             })
             .toList(growable: false),
       ),
-      style: const TextStyle(fontSize: 13, height: 1.5),
+      style: TextStyle(fontSize: fontSize, height: 1.5),
     );
   }
 }

@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_app/features/boards/presentation/widgets/song_card_widget.dart';
 import 'package:my_app/features/boards/presentation/widgets/song_column_widget.dart';
+import 'package:my_app/features/settings/domain/entities/user_preferences.dart';
+import 'package:my_app/features/settings/domain/repositories/settings_repository.dart';
+import 'package:my_app/features/settings/presentation/providers/settings_provider.dart';
 import 'package:my_app/shared/models/song.dart';
 import 'package:my_app/shared/models/song_column.dart';
+
+class _InMemorySettingsRepository implements SettingsRepository {
+  @override
+  Future<UserPreferences> load() async => const UserPreferences();
+
+  @override
+  Future<void> save(UserPreferences preferences) async {}
+}
 
 void main() {
   testWidgets('full expanded lyrics scroll with column without overflow', (
@@ -12,18 +24,27 @@ void main() {
     final lyrics = List.filled(80, 'Long lyric line').join('\n');
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 400,
-            height: 420,
-            child: SongColumnWidget(
-              column: SongColumn(
-                id: 'column',
-                title: 'Set list',
-                songs: [Song(id: 'song', title: 'Long song', lyrics: lyrics)],
+      ProviderScope(
+        overrides: [
+          settingsRepositoryProvider.overrideWithValue(
+            _InMemorySettingsRepository(),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              height: 420,
+              child: SongColumnWidget(
+                column: SongColumn(
+                  id: 'column',
+                  title: 'Set list',
+                  songs: [
+                    Song(id: 'song', title: 'Long song', lyrics: lyrics),
+                  ],
+                ),
+                isViewMode: true,
               ),
-              isViewMode: true,
             ),
           ),
         ),

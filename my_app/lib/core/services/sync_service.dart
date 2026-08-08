@@ -17,6 +17,7 @@ import '../../database/local/models/sync_queue.dart';
 import '../../database/remote/datasources/profile_remote_datasource.dart';
 import '../../database/remote/datasources/song_remote_datasource.dart';
 import '../../features/boards/data/board_codec.dart';
+import '../../features/settings/data/settings_sync_coordinator.dart';
 import '../../features/songs/domain/personal_song_edit_conflict_resolver.dart';
 import '../../features/support/sync/support_sync_coordinator.dart';
 import '../../shared/models/song_attachment.dart';
@@ -32,6 +33,7 @@ class SyncService {
     SyncRemoteDataSource? remote,
     ProfileRemoteDataSource? profileRemote,
     SupportSyncCoordinator? supportSync,
+    SettingsSyncCoordinator? settingsSync,
     Connectivity? connectivity,
   }) : // Isar stays private; public constructor keeps conventional `isar` name.
        // ignore: prefer_initializing_formals
@@ -39,12 +41,14 @@ class SyncService {
        _remote = remote ?? SyncRemoteDataSource(),
        _profileRemote = profileRemote ?? ProfileRemoteDataSource(),
        _supportSync = supportSync ?? SupportSyncCoordinator(isar: isar),
+       _settingsSync = settingsSync ?? SettingsSyncCoordinator(isar: isar),
        _connectivity = connectivity ?? Connectivity();
 
   final Isar _isar;
   final SyncRemoteDataSource _remote;
   final ProfileRemoteDataSource _profileRemote;
   final SupportSyncCoordinator _supportSync;
+  final SettingsSyncCoordinator _settingsSync;
   final Connectivity _connectivity;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   StreamSubscription<AuthState>? _authSubscription;
@@ -123,6 +127,7 @@ class SyncService {
       );
       await _mergePersonalSongEdits(userId, remoteEdits, pending);
       await _supportSync.pull(userId);
+      await _settingsSync.pull(userId);
       pending = await _pendingFor(userId);
 
       // Required conflict invariant: remote state is fetched before any upload.
@@ -153,6 +158,8 @@ class SyncService {
           try {
             if (_supportSync.handles(item)) {
               await _supportSync.apply(item);
+            } else if (_settingsSync.handles(item)) {
+              await _settingsSync.apply(item);
             } else {
               await _remote.apply(item);
             }
@@ -196,6 +203,7 @@ class SyncService {
           ),
         );
         await _supportSync.pull(userId);
+        await _settingsSync.pull(userId);
         await _mergePersonalSongEdits(
           userId,
           await _remote.fetchPersonalSongEdits(),
@@ -260,6 +268,12 @@ class SyncService {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'support_messages',
+          callback: (_) => unawaited(synchronize()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'user_preferences',
           callback: (_) => unawaited(synchronize()),
         )
         .subscribe();
