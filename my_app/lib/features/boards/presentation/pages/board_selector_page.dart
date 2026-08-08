@@ -377,7 +377,7 @@ class _BoardTabs extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.library_music_rounded),
+              Icon(Icons.library_music_rounded, color: AppColors.accent),
               SizedBox(width: 8),
               Text('Boards'),
             ],
@@ -387,7 +387,7 @@ class _BoardTabs extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.queue_music_rounded),
+              Icon(Icons.queue_music_rounded, color: AppColors.accent),
               SizedBox(width: 8),
               Text('My Boards'),
             ],
@@ -450,42 +450,131 @@ class _BoardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final listCount = board.columns.length;
     final songCount = board.columns.fold<int>(
       0,
       (total, column) => total + column.songs.length,
     );
-    return Card(
-      elevation: 3,
-      shadowColor: Colors.black45,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Material(
+      color: AppColors.bgCard,
+      elevation: 1.5,
+      shadowColor: AppColors.text.withValues(alpha: 0.16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+      ),
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        minTileHeight: 72,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        leading: const Icon(
-          Icons.music_note_rounded,
-          color: Colors.black,
-          size: 30,
-        ),
-        title: Text(
-          board.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w400),
-        ),
-        subtitle: Text(
-          '${board.columns.length} ${board.columns.length == 1 ? 'List' : 'Lists'}'
-          '   $songCount ${songCount == 1 ? 'Song' : 'Songs'}',
-          style: const TextStyle(fontSize: 11, color: Colors.black54),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: Colors.black,
-          size: 28,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              const _BoardIcon(),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      board.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _BoardStat(
+                          icon: Icons.view_list_rounded,
+                          count: listCount,
+                        ),
+                        const SizedBox(width: 12),
+                        _BoardStat(
+                          icon: Icons.music_note_rounded,
+                          count: songCount,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEFF1F4),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _BoardIcon extends StatelessWidget {
+  const _BoardIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.accent, AppColors.bg],
+        ),
+      ),
+      child: const Icon(
+        Icons.library_music_rounded,
+        color: Colors.white,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _BoardStat extends StatelessWidget {
+  const _BoardStat({required this.icon, required this.count});
+
+  final IconData icon;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppColors.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -560,90 +649,172 @@ class _ProfileMenu extends ConsumerWidget {
         }
       },
       offset: const Offset(0, 60),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      icon: Container(
-        padding: const EdgeInsets.all(2.5),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary,
-            width: 2,
+      elevation: 12,
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: AppColors.text.withValues(alpha: 0.25),
+      padding: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+      ),
+      icon: _buildAvatar(displayName, avatarImage),
+      itemBuilder: (_) => [
+        _buildHeader(displayName, email, avatarImage),
+        const PopupMenuDivider(height: 10),
+        _buildItem(
+          value: 'subscription',
+          icon: Icons.workspace_premium_outlined,
+          color: AppColors.accent,
+          label: 'Subscription',
+        ),
+        _buildItem(
+          value: 'support',
+          icon: Icons.help_outline_rounded,
+          color: AppColors.textMuted,
+          label: 'Help & Feedback',
+        ),
+        _buildItem(
+          value: 'logout',
+          icon: Icons.logout_rounded,
+          color: const Color(0xFFD32F2F),
+          label: 'Log Out',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatar(String displayName, ImageProvider<Object>? image) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.accent, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+        ],
+      ),
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFEFF3FA),
+            backgroundImage: image,
+            child: image == null
+                ? Text(
+                    displayName[0].toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildHeader(
+    String name,
+    String email,
+    ImageProvider<Object>? image,
+  ) {
+    return PopupMenuItem<String>(
+      enabled: false,
+      height: 80,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F4F9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white,
+              backgroundImage: image,
+              child: image == null
+                  ? Text(
+                      name[0].toUpperCase(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        child: CircleAvatar(
-          radius: 20,
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest,
-          backgroundImage: avatarImage,
-          child: avatarImage == null
-              ? Text(
-                  displayName[0].toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                )
-              : null,
-        ),
       ),
-      itemBuilder: (_) => [
-        const PopupMenuItem<String>(
-          enabled: false,
-          padding: EdgeInsets.zero,
-          height: 12,
-          child: SizedBox.shrink(),
-        ),
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                displayName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 2),
-              Text(email, style: Theme.of(context).textTheme.bodySmall),
-            ],
+    );
+  }
+
+  PopupMenuItem<String> _buildItem({
+    required String value,
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 52,
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: color),
           ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: 'subscription',
-          child: Row(
-            children: [
-              Icon(Icons.workspace_premium_outlined),
-              SizedBox(width: 12),
-              Text('Subscription'),
-            ],
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppColors.text,
+            ),
           ),
-        ),
-        const PopupMenuItem(
-          value: 'support',
-          child: Row(
-            children: [
-              Icon(Icons.help_outline_rounded),
-              SizedBox(width: 12),
-              Text('Help & Feedback'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'logout',
-          child: Row(
-            children: [
-              Icon(Icons.logout_rounded, color: Colors.red),
-              SizedBox(width: 12),
-              Text('Log Out', style: TextStyle(color: Colors.red)),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -135,7 +136,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(48),
+                        top: Radius.circular(38),
                       ),
                     ),
                     child: SingleChildScrollView(
@@ -243,6 +244,42 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ),
                             ),
                           ],
+                          const SizedBox(height: 24),
+                          Text.rich(
+                            textAlign: TextAlign.center,
+                            TextSpan(
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                                height: 1.5,
+                              ),
+                              children: [
+                                const TextSpan(
+                                  text: 'By continuing, you agree to our ',
+                                ),
+                                TextSpan(
+                                  text: 'Terms of Service',
+                                  style: const TextStyle(
+                                    color: _buttonBlue,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () => context.push('/terms'),
+                                ),
+                                const TextSpan(text: ' and '),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: const TextStyle(
+                                    color: _buttonBlue,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () => context.push('/privacy'),
+                                ),
+                                const TextSpan(text: '.'),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),

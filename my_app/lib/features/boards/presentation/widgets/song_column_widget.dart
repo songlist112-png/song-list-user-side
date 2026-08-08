@@ -121,6 +121,7 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                               showArtist: widget.showArtist,
                               showBpm: widget.showBpm,
                               isExpanded: isExpanded,
+                              isViewMode: widget.isViewMode,
                               availableLabels: widget.availableLabels,
                               onTap: widget.isViewMode
                                   ? () => _toggleSongExpansion(song.id)
@@ -198,6 +199,7 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                                 isExpanded: isExpanded,
                                 isReorderable: true,
                                 reorderIndex: index,
+                                isViewMode: widget.isViewMode,
                                 availableLabels: widget.availableLabels,
                                 onTap: widget.isViewMode
                                     ? () => _toggleSongExpansion(song.id)
