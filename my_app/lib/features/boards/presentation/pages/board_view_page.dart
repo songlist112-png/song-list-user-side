@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/screen_capture_protection.dart';
 import '../../../../shared/models/artist.dart';
 import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
@@ -63,6 +64,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(ScreenCaptureProtection.acquire());
     _songList = SongList(
       id: widget.boardId,
       ownerId: '',
@@ -89,6 +91,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   @override
   void dispose() {
+    unawaited(ScreenCaptureProtection.release());
     _debounceTimer?.cancel();
     _boardReloadDebounce?.cancel();
     _boardSubscription?.cancel();
