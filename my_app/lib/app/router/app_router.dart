@@ -8,6 +8,7 @@ import '../../features/support/presentation/pages/create_ticket_page.dart';
 import '../../features/support/presentation/pages/help_feedback_page.dart';
 import '../../features/support/presentation/pages/my_tickets_page.dart';
 import '../../features/support/presentation/pages/ticket_details_page.dart';
+import '../../features/subscription/presentation/widgets/subscription_gate.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -15,9 +16,7 @@ final appRouter = GoRouter(
     final session = Supabase.instance.client.auth.currentSession;
     final location = state.matchedLocation;
     final isPublicRoute =
-        location == '/login' ||
-        location == '/terms' ||
-        location == '/privacy';
+        location == '/login' || location == '/terms' || location == '/privacy';
 
     if (session == null) {
       return isPublicRoute ? null : '/login';
@@ -45,13 +44,21 @@ final appRouter = GoRouter(
         sections: privacyPolicySections(),
       ),
     ),
-    GoRoute(path: '/', builder: (context, state) => const BoardSelectorPage()),
-    GoRoute(
-      path: '/board/:id',
-      builder: (context, state) {
-        final boardId = state.pathParameters['id']!;
-        return BoardViewPage(boardId: boardId);
-      },
+    ShellRoute(
+      builder: (context, state, child) => SubscriptionGate(child: child),
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const BoardSelectorPage(),
+        ),
+        GoRoute(
+          path: '/board/:id',
+          builder: (context, state) {
+            final boardId = state.pathParameters['id']!;
+            return BoardViewPage(boardId: boardId);
+          },
+        ),
+      ],
     ),
     GoRoute(
       path: '/support',

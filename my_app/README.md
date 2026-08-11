@@ -25,6 +25,8 @@ instead of starting the application.
 
 Only browser/mobile-safe values belong in this file. Never add database
 passwords, OAuth client secrets, service-role keys, or other server secrets.
+Set `SUBSCRIPTION_PORTAL_URL` to the public HTTPS page where users can purchase
+or manage their subscription.
 
 VS Code's `Song List (local)` launch configuration supplies this file
 automatically. Use the same option for other run and build commands.

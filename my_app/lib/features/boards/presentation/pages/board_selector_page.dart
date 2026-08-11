@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/constants/env.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
@@ -582,9 +583,7 @@ class _BoardStat extends StatelessWidget {
 class _ProfileMenu extends ConsumerWidget {
   const _ProfileMenu({required this.onSignOut});
 
-  static final _subscriptionUri = Uri.parse(
-    'http://172.28.112.1:3000/user-subs',
-  );
+  static final _subscriptionUri = Uri.parse(Env.subscriptionPortalUrl);
 
   final Future<void> Function() onSignOut;
 

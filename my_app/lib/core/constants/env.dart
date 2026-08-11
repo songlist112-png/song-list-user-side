@@ -10,6 +10,10 @@ abstract final class Env {
   static const googleAuthIosClientId = String.fromEnvironment(
     'GOOGLE_AUTH_IOS_CLIENT_ID',
   );
+  static const subscriptionPortalUrl = String.fromEnvironment(
+    'SUBSCRIPTION_PORTAL_URL',
+    defaultValue: 'https://song-list-admin-side.vercel.app/user-subs',
+  );
 
   static List<String> get missingRequiredKeys {
     const requiredValues = {

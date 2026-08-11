@@ -10,6 +10,7 @@ $allowedKeys = @(
     'GOOGLE_AUTH_WEB_CLIENT_ID'
     'GOOGLE_AUTH_ANDROID_CLIENT_ID'
     'GOOGLE_AUTH_IOS_CLIENT_ID'
+    'SUBSCRIPTION_PORTAL_URL'
 )
 $requiredKeys = $allowedKeys[0..2]
 
