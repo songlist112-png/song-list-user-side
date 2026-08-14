@@ -25,10 +25,11 @@ void main() {
 
   SubscriptionEntitlement entitlement({
     SubscriptionStatus status = SubscriptionStatus.trial,
+    String plan = 'trial',
     DateTime? expiresAt,
     DateTime? graceUntil,
   }) => SubscriptionEntitlement(
-    plan: 'trial',
+    plan: plan,
     status: status,
     expiresAt: expiresAt ?? now.add(const Duration(days: 7)),
     lastValidatedAt: now,
@@ -61,6 +62,41 @@ void main() {
     await controller.validate();
 
     expect(controller.state.status, SubscriptionGateStatus.entitled);
+  });
+
+  test(
+    'allows cached access immediately before the 24-hour deadline',
+    () async {
+      final repository = _FakeSubscriptionRepository()
+        ..remoteError = const SocketException('offline')
+        ..cached = entitlement();
+      final controller = SubscriptionGateController(
+        repository,
+        () => 'user-1',
+        clock: () => now
+            .add(const Duration(hours: 24))
+            .subtract(const Duration(microseconds: 1)),
+      );
+
+      await controller.validate();
+
+      expect(controller.state.status, SubscriptionGateStatus.entitled);
+    },
+  );
+
+  test('requires validation at exactly 24 hours offline', () async {
+    final repository = _FakeSubscriptionRepository()
+      ..remoteError = const SocketException('offline')
+      ..cached = entitlement();
+    final controller = SubscriptionGateController(
+      repository,
+      () => 'user-1',
+      clock: () => now.add(const Duration(hours: 24)),
+    );
+
+    await controller.validate();
+
+    expect(controller.state.status, SubscriptionGateStatus.internetRequired);
   });
 
   test('requires internet when the offline grace period is stale', () async {
@@ -131,4 +167,39 @@ void main() {
 
     expect(controller.state.status, SubscriptionGateStatus.expired);
   });
+
+  test('blocks an expired trial even when its status is still trial', () async {
+    final repository = _FakeSubscriptionRepository()
+      ..remote = entitlement(status: SubscriptionStatus.trial, expiresAt: now);
+    final controller = SubscriptionGateController(
+      repository,
+      () => 'user-1',
+      clock: () => now,
+    );
+
+    await controller.validate();
+
+    expect(controller.state.status, SubscriptionGateStatus.expired);
+  });
+
+  test(
+    'blocks an expired paid subscription even when status is active',
+    () async {
+      final repository = _FakeSubscriptionRepository()
+        ..remote = entitlement(
+          status: SubscriptionStatus.active,
+          plan: 'monthly',
+          expiresAt: now,
+        );
+      final controller = SubscriptionGateController(
+        repository,
+        () => 'user-1',
+        clock: () => now,
+      );
+
+      await controller.validate();
+
+      expect(controller.state.status, SubscriptionGateStatus.expired);
+    },
+  );
 }

@@ -125,41 +125,6 @@ class _SubscriptionModalState extends State<SubscriptionModal> {
   }
 }
 
-// class _ModalIcon extends StatelessWidget {
-//   const _ModalIcon({required this.problem});
-
-//   final SubscriptionProblem problem;
-
-//   @override
-//   Widget build(BuildContext context) => Container(
-//     width: 76,
-//     height: 76,
-//     decoration: BoxDecoration(
-//       gradient: const LinearGradient(
-//         begin: Alignment.topLeft,
-//         end: Alignment.bottomRight,
-//         colors: [Color(0xFF2D7FF9), Color(0xFF7147F8)],
-//       ),
-//       borderRadius: BorderRadius.circular(24),
-//     ),
-//     child: Icon(
-//       switch (problem) {
-//         SubscriptionProblem.expired => Icons.workspace_premium_rounded,
-//         SubscriptionProblem.internetRequired => Icons.wifi_off_rounded,
-//         SubscriptionProblem.serviceUnavailable => Icons.cloud_off_rounded,
-//       },
-//       color: Colors.white,
-//       size: 38,
-//       semanticLabel: switch (problem) {
-//         SubscriptionProblem.expired => 'Subscription required',
-//         SubscriptionProblem.internetRequired => 'Internet required',
-//         SubscriptionProblem.serviceUnavailable =>
-//           'Subscription service unavailable',
-//       },
-//     ),
-//   );
-// }
-
 class _ModalContent {
   const _ModalContent(this.title, this.message);
 

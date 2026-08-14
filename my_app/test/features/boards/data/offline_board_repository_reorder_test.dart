@@ -59,6 +59,7 @@ void main() {
         'one',
         'two',
       ]);
+      expect(restored.columns.first.songs[1], _hasOriginalMetadata);
 
       final queue = await isar.syncQueues.where().findAll();
       expect(queue, hasLength(1));
@@ -85,6 +86,7 @@ void main() {
         'three',
       ]);
       expect(restored.columns[1].songs.map((song) => song.id), ['one']);
+      expect(restored.columns[1].songs.single, _hasOriginalMetadata);
 
       final queue = await isar.syncQueues.where().findAll();
       expect(queue, hasLength(1));
@@ -182,7 +184,16 @@ Future<void> _seedBoard(Isar isar) async {
         id: 'column',
         title: 'Set list',
         songs: [
-          Song(id: 'one', title: 'One'),
+          Song(
+            id: 'one',
+            title: 'One',
+            artistName: 'Artist',
+            tempo: 120,
+            key: 'C',
+            keyType: 'Major',
+            labels: ['label'],
+            lyrics: 'Original lyrics',
+          ),
           Song(id: 'two', title: 'Two'),
           Song(id: 'three', title: 'Three'),
         ],
@@ -212,3 +223,11 @@ OfflineBoardRepository _repository(
 
 Future<Uint8List> _unusedDownload(SongAttachment _) =>
     throw UnsupportedError('Not used by reorder test');
+
+final _hasOriginalMetadata = isA<Song>()
+    .having((song) => song.title, 'title', 'One')
+    .having((song) => song.artistName, 'artist', 'Artist')
+    .having((song) => song.tempo, 'tempo', 120)
+    .having((song) => song.keyDisplay, 'key', 'C Major')
+    .having((song) => song.labels, 'labels', ['label'])
+    .having((song) => song.lyrics, 'lyrics', 'Original lyrics');
