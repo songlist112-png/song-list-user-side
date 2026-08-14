@@ -21,6 +21,9 @@ class AppColors {
   // Accent / primary action blue
   static const Color accent = Color(0xFF0C66E4);
 
+  // User-owned lyric overrides and notes.
+  static const Color personalEdit = Color(0xFF04963A);
+
   // Border
   static const Color border = Color(0xFFDCDFE4);
 

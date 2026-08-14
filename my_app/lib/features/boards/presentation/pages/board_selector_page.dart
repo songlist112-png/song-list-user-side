@@ -1,455 +1,353 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../../shared/models/artist.dart';
-import '../../../../shared/models/song.dart';
-import '../../../../shared/models/song_column.dart';
+import '../../../../core/constants/env.dart';
+import '../../../../core/services/sync_service.dart';
 import '../../../../shared/models/song_list.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../profile/providers/current_profile_provider.dart';
+import '../../data/board_repository.dart';
+import '../widgets/name_prompt_dialog.dart';
 
-class BoardSelectorPage extends StatefulWidget {
+class BoardSelectorPage extends ConsumerStatefulWidget {
   const BoardSelectorPage({super.key});
 
   @override
-  State<BoardSelectorPage> createState() => _BoardSelectorPageState();
+  ConsumerState<BoardSelectorPage> createState() => _BoardSelectorPageState();
 }
 
-class _BoardSelectorPageState extends State<BoardSelectorPage> {
-  // In-memory data — will be replaced with Supabase later
-  final List<SongList> _songLists = [
-    SongList(
-      id: '1',
-      name: 'My Song List',
-      columns: [
-        SongColumn(
-          id: 'c1',
-          title: 'List 1',
-          songs: [
-            const Song(
-              id: 's1',
-              title: 'Perfect',
-              key: 'G',
-              keyType: 'Minor',
-              artistName: 'Ed Sheeran',
-              attachments: ['file.pdf'],
-            ),
-          ],
-          order: 0,
-        ),
-        const SongColumn(id: 'c2', title: 'New List', order: 1),
-      ],
-      artists: [const Artist(id: 'a1', name: 'Ed Sheeran')],
-      showArtist: true,
-      createdAt: DateTime.now(),
-    ),
-    SongList(
-      id: '2',
-      name: 'My own list',
-      columns: [
-        SongColumn(
-          id: 'c3',
-          title: 'List 1',
-          songs: [
-            const Song(
-              id: 's2',
-              title: 'Perfect',
-              key: 'G#m',
-              artistName: 'Ed Sheeran',
-              attachments: ['file.pdf'],
-            ),
-          ],
-          order: 0,
-        ),
-        const SongColumn(id: 'c4', title: 'New List', order: 1),
-      ],
-      artists: [const Artist(id: 'a1', name: 'Ed Sheeran')],
-      showArtist: true,
-      createdAt: DateTime.now(),
-    ),
-  ];
+class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
+    with SingleTickerProviderStateMixin {
+  static const _libraryTabIndex = 0;
+  static const _mySongsTabIndex = 1;
 
-  void _createNewSongList() {
-    final controller = TextEditingController();
+  late Future<List<SongList>> _boards;
+  late final TabController _tabController;
+  StreamSubscription<void>? _boardSubscription;
+  Timer? _reloadDebounce;
+  List<SongList> _visibleBoards = const [];
+  bool _hasLoaded = false;
+  int _selectedTabIndex = _libraryTabIndex;
 
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Icon
-                Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    Icons.library_music_rounded,
-                    color: Colors.blue.shade700,
-                    size: 34,
-                  ),
-                ),
+  BoardRepository get _repository => ref.read(boardRepositoryProvider);
 
-                const SizedBox(height: 20),
-
-                // Title
-                const Text(
-                  'Create New Board',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                    letterSpacing: -.3,
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                // Subtitle
-                Text(
-                  'Organize your songs by creating a new board.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // TextField
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    hintText: 'Enter board name',
-                    prefixIcon: const Icon(Icons.edit_outlined),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 18,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: Colors.blue.shade600,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  onSubmitted: (_) {
-                    final name = controller.text.trim();
-
-                    if (name.isEmpty) return;
-
-                    setState(() {
-                      _songLists.add(
-                        SongList(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
-                          name: name,
-                          createdAt: DateTime.now(),
-                        ),
-                      );
-                    });
-
-                    Navigator.pop(dialogContext);
-                  },
-                ),
-
-                const SizedBox(height: 28),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.black87,
-                          side: BorderSide(color: Colors.grey.shade300),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          final name = controller.text.trim();
-
-                          if (name.isEmpty) return;
-
-                          setState(() {
-                            _songLists.add(
-                              SongList(
-                                id: DateTime.now().millisecondsSinceEpoch
-                                    .toString(),
-                                name: name,
-                                createdAt: DateTime.now(),
-                              ),
-                            );
-                          });
-
-                          Navigator.pop(dialogContext);
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'Create',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _deleteSongList(String id) {
-    setState(() {
-      _songLists.removeWhere((l) => l.id == id);
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(_handleTabChanged);
+    _boards = _fetchBoards();
+    _boardSubscription = _repository.watchChanges().listen((_) {
+      _reloadDebounce?.cancel();
+      _reloadDebounce = Timer(const Duration(milliseconds: 120), () {
+        if (mounted) _reload();
+      });
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: const Text('Venue Boards'),
-        centerTitle: true,
-        actions: [
-          Builder(
-            builder: (context) {
-              final user = Supabase.instance.client.auth.currentUser;
-              final avatarUrl = user?.userMetadata?['avatar_url'];
-              final email = user?.email ?? 'Unknown';
-              final name =
-                  user?.userMetadata?['full_name'] ??
-                  user?.userMetadata?['name'] ??
-                  'User';
+  void dispose() {
+    _tabController
+      ..removeListener(_handleTabChanged)
+      ..dispose();
+    _boardSubscription?.cancel();
+    _reloadDebounce?.cancel();
+    super.dispose();
+  }
 
-              return PopupMenuButton<String>(
-                offset: const Offset(0, 48),
-                icon: Container(
-                  width: 40, // Increased size for better visibility
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: .4),
-                      width: 2.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: .1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    radius: 18, // Slightly smaller to show the border
-                    backgroundColor: Colors.white.withValues(alpha: .15),
-                    backgroundImage: avatarUrl != null
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: avatarUrl == null
-                        ? Icon(
-                            Icons.person,
-                            color: Colors.white.withValues(alpha: .9),
-                            size: 22,
-                          )
-                        : null,
-                  ),
-                ),
-                onSelected: (value) async {
-                  if (value == 'logout') {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgCard,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const CupertinoActivityIndicator(
-                            radius: 16,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ),
-                    );
-                    try {
-                      await GoogleSignIn().signOut();
-                    } catch (_) {}
-                    await Supabase.instance.client.auth.signOut();
-                    if (context.mounted) {
-                      Navigator.of(context).pop(); // Dismiss loading dialog
-                      context.go('/login');
-                    }
-                  }
-                },
-                itemBuilder: (context) {
-                  return [
-                    PopupMenuItem<String>(
-                      enabled: false,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.text,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            email,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem<String>(
-                      value: 'logout',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.logout,
-                            size: 18,
-                            color: AppColors.textMuted,
-                          ),
-                          SizedBox(width: 10),
-                          Text('Log Out'),
-                        ],
-                      ),
-                    ),
-                  ];
-                },
-              );
-            },
+  Future<List<SongList>> _fetchBoards() async {
+    try {
+      final boards = await _repository.fetchBoards();
+      _visibleBoards = boards;
+      return boards;
+    } finally {
+      _hasLoaded = true;
+    }
+  }
+
+  void _reload() {
+    _reloadDebounce?.cancel();
+    setState(() {
+      _boards = _fetchBoards();
+    });
+  }
+
+  void _handleTabChanged() {
+    if (!mounted || _selectedTabIndex == _tabController.index) return;
+    setState(() => _selectedTabIndex = _tabController.index);
+  }
+
+  Future<void> _createBoard() async {
+    final name = await showNamePrompt(
+      context,
+      title: 'Create Board',
+      label: 'Board name',
+    );
+    if (name == null) return;
+    await _runMutation(
+      () => _repository.createBoard(name),
+      successMessage: 'Board created',
+    );
+  }
+
+  Future<void> _renameBoard(SongList board) async {
+    final name = await showNamePrompt(
+      context,
+      title: 'Rename Board',
+      initialValue: board.name,
+      label: 'Board name',
+    );
+    if (name == null || name == board.name) return;
+    await _runMutation(
+      () => _repository.updateBoard(board.copyWith(name: name)),
+    );
+  }
+
+  Future<void> _deleteBoard(SongList board) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete board?'),
+        content: Text('"${board.name}" and all its content will be deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+    );
+    if (confirmed == true) {
+      await _runMutation(() => _repository.deleteBoard(board.id));
+    }
+  }
+
+  Future<void> _showBoardActions(SongList board) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () => Navigator.pop(context, 'rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'rename') await _renameBoard(board);
+    if (action == 'delete') await _deleteBoard(board);
+  }
+
+  Future<void> _runMutation(
+    Future<Object?> Function() mutation, {
+    String? successMessage,
+  }) async {
+    try {
+      await mutation();
+      if (mounted) {
+        _reload();
+        if (successMessage != null) {
+          AppSnackbar.showSuccess(context, successMessage);
+        }
+      }
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
+
+  void _showError(Object error) {
+    debugPrint('Board operation failed: $error');
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Could not save change: $error')));
+  }
+
+  Future<void> _signOut() async {
+    await ref.read(authControllerProvider).signOut();
+    if (mounted) {
+      AppSnackbar.showSuccess(context, 'Signed out successfully');
+      context.go('/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = ref.watch(currentProfileProvider).asData?.value;
+    final canCreateBoard = profile != null && profile.role != 'admin';
+    final showCreateButton =
+        _selectedTabIndex == _mySongsTabIndex && canCreateBoard;
+
+    return Scaffold(
+      backgroundColor: AppColors.bgDark,
+      body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
+            _WelcomeHeader(onSignOut: _signOut),
             Expanded(
-              child: _songLists.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.library_music_outlined,
-                            size: 64,
-                            color: Colors.white.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No song lists yet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Create your board to get started',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
-                          ),
-                        ],
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF4F4F4),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    _BoardTabs(controller: _tabController),
+                    Expanded(
+                      child: FutureBuilder<List<SongList>>(
+                        future: _boards,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState !=
+                                  ConnectionState.done &&
+                              !_hasLoaded) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError && !_hasLoaded) {
+                            return _LoadError(onRetry: _reload);
+                          }
+
+                          final boards = snapshot.data ?? _visibleBoards;
+
+                          final libraryBoards = boards
+                              .where(
+                                (board) =>
+                                    board.creatorType == BoardCreatorType.admin,
+                              )
+                              .toList(growable: false);
+
+                          final userBoards = boards
+                              .where(
+                                (board) =>
+                                    board.creatorType == BoardCreatorType.user,
+                              )
+                              .toList(growable: false);
+
+                          return TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _BoardList(
+                                boards: libraryBoards,
+                                emptyMessage: 'No library songs available',
+                                onRefresh: _refreshBoards,
+                                onOpen: _openBoard,
+                              ),
+                              _BoardList(
+                                boards: userBoards,
+                                emptyMessage: 'No songs created yet',
+                                onRefresh: _refreshBoards,
+                                onOpen: _openBoard,
+                                onLongPress: _showBoardActions,
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: _songLists.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final list = _songLists[index];
-                        return _SongListTile(
-                          songList: list,
-                          onTap: () {
-                            context.push('/board/${list.id}');
-                          },
-                          onDelete: () => _deleteSongList(list.id),
-                        );
-                      },
                     ),
-            ),
-            const SizedBox(height: 16),
-            // Create new button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _createNewSongList,
-                icon: const Icon(Icons.add),
-                label: const Text('Create New Board'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: AppColors.bgDark,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+      floatingActionButton: showCreateButton
+          ? FloatingActionButton(
+              onPressed: _createBoard,
+              tooltip: 'Create a new song list',
+              backgroundColor: const Color(0xFF062A68),
+              foregroundColor: Colors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, size: 30),
+            )
+          : null,
+    );
+  }
+
+  Future<void> _refreshBoards() async {
+    _reload();
+    await _boards;
+  }
+
+  Future<void> _openBoard(SongList board) async {
+    await context.push('/board/${board.id}');
+    if (mounted) _reload();
+  }
+}
+
+class _WelcomeHeader extends ConsumerWidget {
+  const _WelcomeHeader({required this.onSignOut});
+
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // final profile = ref.watch(currentProfileProvider).asData?.value;
+    // final fullName = profile?.fullName?.trim();
+    // final email = profile?.email ?? '';
+    // final displayName = fullName != null && fullName.isNotEmpty
+    //     ? fullName
+    //     : email.isNotEmpty
+    //     ? email.split('@').first
+    //     : 'Song List user';
+
+    return SizedBox(
+      height: 132,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 12, 28),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Venue Boards',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                  // const SizedBox(height: 2),
+                  // Text(
+                  //   displayName,
+                  //   maxLines: 1,
+                  //   overflow: TextOverflow.ellipsis,
+                  //   style: const TextStyle(color: Colors.white, fontSize: 16),
+                  // ),
+                ],
+              ),
+            ),
+            _ProfileMenu(onSignOut: onSignOut),
           ],
         ),
       ),
@@ -457,70 +355,171 @@ class _BoardSelectorPageState extends State<BoardSelectorPage> {
   }
 }
 
-class _SongListTile extends StatelessWidget {
-  final SongList songList;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
+class _BoardTabs extends StatelessWidget {
+  const _BoardTabs({required this.controller});
 
-  const _SongListTile({
-    required this.songList,
-    required this.onTap,
-    required this.onDelete,
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 80,
+    child: TabBar(
+      controller: controller,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      indicatorColor: AppColors.accent,
+      indicatorSize: TabBarIndicatorSize.label,
+      indicatorWeight: 3,
+      dividerColor: Colors.transparent,
+      labelColor: Colors.black,
+      unselectedLabelColor: Colors.black,
+      labelStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+      tabs: const [
+        Tab(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.library_music_rounded, color: AppColors.accent),
+              SizedBox(width: 8),
+              Text('Boards'),
+            ],
+          ),
+        ),
+        Tab(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.queue_music_rounded, color: AppColors.accent),
+              SizedBox(width: 8),
+              Text('My Boards'),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BoardList extends StatelessWidget {
+  const _BoardList({
+    required this.boards,
+    required this.emptyMessage,
+    required this.onRefresh,
+    required this.onOpen,
+    this.onLongPress,
   });
+
+  final List<SongList> boards;
+  final String emptyMessage;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function(SongList board) onOpen;
+  final Future<void> Function(SongList board)? onLongPress;
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: boards.isEmpty
+        ? _EmptyBoards(message: emptyMessage)
+        : ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 96),
+            itemCount: boards.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final board = boards[index];
+              return _BoardTile(
+                board: board,
+                onTap: () => onOpen(board),
+                onLongPress: board.canEdit && onLongPress != null
+                    ? () => onLongPress!(board)
+                    : null,
+              );
+            },
+          ),
+  );
+}
+
+class _BoardTile extends StatelessWidget {
+  const _BoardTile({
+    required this.board,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  final SongList board;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
+    final listCount = board.columns.length;
+    final songCount = board.columns.fold<int>(
+      0,
+      (total, column) => total + column.songs.length,
+    );
     return Material(
       color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(8),
+      elevation: 1.5,
+      shadowColor: AppColors.text.withValues(alpha: 0.16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        onLongPress: onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           child: Row(
             children: [
-              const Icon(
-                Icons.library_music,
-                color: AppColors.accent,
-                size: 22,
-              ),
+              const _BoardIcon(),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      songList.name,
+                      board.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.text,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${songList.columns.length} lists · ${songList.columns.fold<int>(0, (sum, c) => sum + c.songs.length)} songs',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _BoardStat(
+                          icon: Icons.view_list_rounded,
+                          count: listCount,
+                        ),
+                        const SizedBox(width: 12),
+                        _BoardStat(
+                          icon: Icons.music_note_rounded,
+                          count: songCount,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  size: 20,
-                  color: AppColors.textMuted,
+              const SizedBox(width: 10),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEFF1F4),
+                  shape: BoxShape.circle,
                 ),
-                onSelected: (val) {
-                  if (val == 'delete') onDelete();
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                  size: 22,
+                ),
               ),
             ],
           ),
@@ -528,4 +527,335 @@ class _SongListTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BoardIcon extends StatelessWidget {
+  const _BoardIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.accent, AppColors.bg],
+        ),
+      ),
+      child: const Icon(
+        Icons.library_music_rounded,
+        color: Colors.white,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _BoardStat extends StatelessWidget {
+  const _BoardStat({required this.icon, required this.count});
+
+  final IconData icon;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppColors.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileMenu extends ConsumerWidget {
+  const _ProfileMenu({required this.onSignOut});
+
+  static final _subscriptionUri = Uri.parse(Env.subscriptionPortalUrl);
+
+  final Future<void> Function() onSignOut;
+
+  Future<void> _openSubscription(BuildContext context) async {
+    try {
+      final opened = await launchUrl(
+        _subscriptionUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && context.mounted) {
+        _showLaunchError(context);
+      }
+    } on Exception {
+      if (context.mounted) _showLaunchError(context);
+    }
+  }
+
+  void _showLaunchError(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open subscription page')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentProfileProvider).asData?.value;
+    final fullName = profile?.fullName?.trim();
+    final email = profile?.email ?? '';
+    final displayName = fullName != null && fullName.isNotEmpty
+        ? fullName
+        : email.isNotEmpty
+        ? email.split('@').first
+        : 'User';
+    final avatarPath = profile?.avatarLocalPath;
+    final avatarFile = avatarPath == null ? null : File(avatarPath);
+    final hasCachedAvatar = avatarFile?.existsSync() ?? false;
+    final ImageProvider<Object>? avatarImage = hasCachedAvatar
+        ? FileImage(avatarFile!)
+        : null;
+
+    if (!hasCachedAvatar && profile?.avatarUrl?.isNotEmpty == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(
+          ref.read(syncServiceProvider).cacheProfileAvatar(profile!).catchError(
+            (Object error) {
+              debugPrint('Avatar cache failed: $error');
+              return null;
+            },
+          ),
+        );
+      });
+    }
+
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        if (value == 'subscription') {
+          unawaited(_openSubscription(context));
+        } else if (value == 'support') {
+          context.push('/support');
+        } else if (value == 'logout') {
+          onSignOut();
+        }
+      },
+      offset: const Offset(0, 60),
+      elevation: 12,
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: AppColors.text.withValues(alpha: 0.25),
+      padding: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+      ),
+      icon: _buildAvatar(displayName, avatarImage),
+      itemBuilder: (_) => [
+        _buildHeader(displayName, email, avatarImage),
+        const PopupMenuDivider(height: 10),
+        _buildItem(
+          value: 'subscription',
+          icon: Icons.workspace_premium_outlined,
+          color: AppColors.accent,
+          label: 'Subscription',
+        ),
+        _buildItem(
+          value: 'support',
+          icon: Icons.help_outline_rounded,
+          color: AppColors.textMuted,
+          label: 'Help & Feedback',
+        ),
+        _buildItem(
+          value: 'logout',
+          icon: Icons.logout_rounded,
+          color: const Color(0xFFD32F2F),
+          label: 'Log Out',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatar(String displayName, ImageProvider<Object>? image) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.accent, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFEFF3FA),
+            backgroundImage: image,
+            child: image == null
+                ? Text(
+                    displayName[0].toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildHeader(
+    String name,
+    String email,
+    ImageProvider<Object>? image,
+  ) {
+    return PopupMenuItem<String>(
+      enabled: false,
+      height: 80,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F4F9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white,
+              backgroundImage: image,
+              child: image == null
+                  ? Text(
+                      name[0].toUpperCase(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildItem({
+    required String value,
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 52,
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppColors.text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyBoards extends StatelessWidget {
+  const _EmptyBoards({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    children: [
+      const SizedBox(height: 150),
+      const Icon(Icons.library_music_outlined, size: 58, color: Colors.black26),
+      const SizedBox(height: 14),
+      Center(
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.black45, fontSize: 16),
+        ),
+      ),
+    ],
+  );
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Could not load boards'),
+        const SizedBox(height: 8),
+        FilledButton(onPressed: onRetry, child: const Text('Retry')),
+      ],
+    ),
+  );
 }

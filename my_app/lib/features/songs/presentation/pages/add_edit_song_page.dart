@@ -1,15 +1,23 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
+import '../../../../shared/models/song_attachment.dart';
+import '../../../../shared/utils/media_type.dart';
 
 class AddEditSongPage extends StatefulWidget {
   final Song? existingSong;
   final List<String> availableArtists;
   final List<Label> availableLabels;
-  final Function(Song) onSave;
+  final Future<void> Function(Song) onSave;
+  final Future<void> Function()? onDelete;
+  final Future<Uint8List> Function(SongAttachment)? onDownloadAttachment;
 
   const AddEditSongPage({
     super.key,
@@ -17,6 +25,8 @@ class AddEditSongPage extends StatefulWidget {
     required this.availableArtists,
     this.availableLabels = const [],
     required this.onSave,
+    this.onDelete,
+    this.onDownloadAttachment,
   });
 
   @override
@@ -30,20 +40,29 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
   String? _selectedArtist;
   String? _selectedKey;
   String _selectedKeyType = 'Major';
-  List<String> _attachments = [];
+  List<SongAttachment> _attachments = [];
   List<String> _selectedLabelIds = [];
-
   static const List<String> _keys = [
     '(none)',
-    'C',
-    'D',
-    'E',
-    'F',
-    'G',
-    'A',
-    'B',
+    "C",
+    "C♯",
+    "D",
+    "Db",
+    "D#",
+    "E♭",
+    "E",
+    "F",
+    "F♯",
+    "G",
+    "Gb",
+    "G#",
+    "A♭",
+    "A",
+    "A#",
+    "B♭",
+    "B",
   ];
-  static const List<String> _keyTypes = ['Major', 'Minor'];
+  static const List<String> _keyTypes = ["Major", "Minor", "Freygish"];
 
   @override
   void initState() {
@@ -60,7 +79,9 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     _selectedArtist = widget.existingSong?.artistName;
     _selectedKey = widget.existingSong?.key;
     _selectedKeyType = widget.existingSong?.keyType ?? 'Major';
-    _attachments = List<String>.from(widget.existingSong?.attachments ?? []);
+    _attachments = List<SongAttachment>.from(
+      widget.existingSong?.attachments ?? const [],
+    );
     _selectedLabelIds = List<String>.from(widget.existingSong?.labels ?? []);
   }
 
@@ -72,13 +93,16 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     super.dispose();
   }
 
-  void _handleSave() {
-    if (_titleController.text.trim().isEmpty) return;
+  Future<void> _handleSave() async {
+    if (_titleController.text.trim().isEmpty || _isSaving) return;
 
     final song = Song(
       id:
           widget.existingSong?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
+      createdBy: widget.existingSong?.createdBy,
+      creatorType: widget.existingSong?.creatorType ?? SongCreatorType.user,
+      canEdit: widget.existingSong?.canEdit ?? true,
       title: _titleController.text.trim(),
       artistName: _selectedArtist,
       tempo: int.tryParse(_tempoController.text),
@@ -88,8 +112,34 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       attachments: _attachments,
       labels: _selectedLabelIds,
     );
-    widget.onSave(song);
-    Navigator.of(context).pop();
+    setState(() => _isSaving = true);
+    try {
+      await widget.onSave(song);
+      if (mounted) Navigator.of(context).pop();
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _handleDelete() async {
+    if (widget.onDelete == null || _isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await widget.onDelete!();
+      if (mounted) Navigator.of(context).pop();
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _showError(Object error) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Could not save song: $error')));
   }
 
   @override
@@ -115,10 +165,16 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
+          if (widget.onDelete != null)
+            IconButton(
+              onPressed: _isSaving ? null : _handleDelete,
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: 'Delete song',
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton(
-              onPressed: _handleSave,
+              onPressed: _isSaving ? null : _handleSave,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
@@ -196,27 +252,27 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Container(
-                      height: 48,
-                      width: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: IconButton(
-                        onPressed: _showAddArtistDialog,
-                        icon: const Icon(
-                          Icons.add,
-                          size: 20,
-                          color: AppColors.accent,
-                        ),
-                        tooltip: 'Add new artist',
-                      ),
-                    ),
+                    // const SizedBox(width: 10),
+                    // Container(
+                    //   height: 48,
+                    //   width: 48,
+                    //   decoration: BoxDecoration(
+                    //     color: AppColors.accent.withValues(alpha: 0.1),
+                    //     borderRadius: BorderRadius.circular(12),
+                    //     border: Border.all(
+                    //       color: AppColors.accent.withValues(alpha: 0.3),
+                    //     ),
+                    //   ),
+                    //   child: IconButton(
+                    //     onPressed: _showAddArtistDialog,
+                    //     icon: const Icon(
+                    //       Icons.add,
+                    //       size: 20,
+                    //       color: AppColors.accent,
+                    //     ),
+                    //     tooltip: 'Add new artist',
+                    //   ),
+                    // ),
                   ],
                 ),
               ],
@@ -530,7 +586,8 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                   const SizedBox(height: 12),
                   ..._attachments.asMap().entries.map((entry) {
                     final index = entry.key;
-                    final fileName = entry.value;
+                    final attachment = entry.value;
+                    final fileName = attachment.name;
                     final extension = fileName.toLowerCase().split('.').last;
 
                     // Determine icon and color based on file type
@@ -601,7 +658,11 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                                   minHeight: 36,
                                 ),
                                 tooltip: 'Download file',
-                                onPressed: () => _downloadAttachment(fileName),
+                                onPressed:
+                                    attachment.storagePath == null ||
+                                        widget.onDownloadAttachment == null
+                                    ? null
+                                    : () => _downloadAttachment(attachment),
                               ),
                               const SizedBox(width: 4),
                             ],
@@ -721,38 +782,38 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     );
   }
 
-  void _showAddArtistDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Artist'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Artist name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                setState(() {
-                  _selectedArtist = name;
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _showAddArtistDialog() {
+  //   final controller = TextEditingController();
+  //   showDialog(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       title: const Text('Add Artist'),
+  //       content: TextField(
+  //         controller: controller,
+  //         autofocus: true,
+  //         decoration: const InputDecoration(hintText: 'Artist name'),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(ctx),
+  //           child: const Text('Cancel'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             final name = controller.text.trim();
+  //             if (name.isNotEmpty) {
+  //               setState(() {
+  //                 _selectedArtist = name;
+  //               });
+  //             }
+  //             Navigator.pop(ctx);
+  //           },
+  //           child: const Text('Add'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Future<void> _pickFile() async {
     try {
@@ -763,9 +824,19 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       );
 
       if (result != null && result.files.single.path != null) {
+        final file = result.files.single;
         setState(() {
-          // Store the file path or name
-          _attachments.add(result.files.single.name);
+          _attachments.add(
+            SongAttachment(
+              name: file.name,
+              localPath: file.path,
+              fileType: normalizeMediaType(
+                file.extension ?? '',
+                fileName: file.name,
+              ),
+              fileSize: file.size,
+            ),
+          );
         });
       }
     } catch (e) {
@@ -784,23 +855,27 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     });
   }
 
-  Future<void> _downloadAttachment(String fileName) async {
-    // Show a message that download functionality is not yet implemented
-    // In a real app, you would download the file from your backend/storage
-    if (mounted) {
+  Future<void> _downloadAttachment(SongAttachment attachment) async {
+    try {
+      final bytes = await widget.onDownloadAttachment!(attachment);
+      final directory = await getApplicationDocumentsDirectory();
+      final safeName = attachment.name.replaceAll(
+        RegExp(r'[^a-zA-Z0-9._-]'),
+        '_',
+      );
+      final file = File('${directory.path}/$safeName');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Downloading $fileName...'),
-          duration: const Duration(seconds: 2),
-        ),
+        SnackBar(content: Text('Saved ${attachment.name} to ${file.path}')),
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download attachment: $error')),
       );
     }
-
-    // TODO: Implement actual download logic
-    // Example:
-    // 1. Get file URL from backend using fileName
-    // 2. Download file using url_launcher or dio package
-    // 3. Save to device using path_provider
-    // 4. Show success message
   }
 }
+
+bool _isSaving = false;

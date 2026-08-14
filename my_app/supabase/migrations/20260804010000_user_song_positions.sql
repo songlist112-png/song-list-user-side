@@ -1,0 +1,3 @@
+-- Reserved migration number.
+-- Personal ordering of admin-created songs was intentionally removed.
+-- Reordering remains restricted to songs owned by the authenticated user.

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/models/song_list.dart';
 
@@ -69,8 +70,7 @@ class BoardSelectorDialog extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color:
-                                  isActive ? Colors.white : AppColors.text,
+                              color: isActive ? Colors.white : AppColors.text,
                             ),
                           ),
                         ),
@@ -113,10 +113,7 @@ class BoardSelectorDialog extends StatelessWidget {
                 child: const Center(
                   child: Text(
                     '+ Create New Song List',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 14, color: AppColors.textMuted),
                   ),
                 ),
               ),

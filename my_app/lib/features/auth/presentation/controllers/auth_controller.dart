@@ -1,104 +1,77 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/constants/env.dart';
 
 final authControllerProvider = Provider<AuthController>((ref) {
   return AuthController();
 });
 
+abstract interface class GoogleAuthClient {
+  Future<GoogleSignInAuthentication?> authenticate();
+  Future<void> signOut();
+}
+
+class NativeGoogleAuthClient implements GoogleAuthClient {
+  NativeGoogleAuthClient({GoogleSignIn? googleSignIn})
+    : _googleSignIn =
+          googleSignIn ??
+          GoogleSignIn(serverClientId: Env.googleAuthWebClientId);
+
+  final GoogleSignIn _googleSignIn;
+
+  @override
+  Future<GoogleSignInAuthentication?> authenticate() async {
+    final user = await _googleSignIn.signIn();
+    return user?.authentication;
+  }
+
+  @override
+  Future<void> signOut() => _googleSignIn.signOut();
+}
+
 class AuthController {
+  AuthController({SupabaseClient? supabase, GoogleAuthClient? googleAuthClient})
+    : _supabase = supabase ?? Supabase.instance.client,
+      _googleAuthClient = googleAuthClient ?? NativeGoogleAuthClient();
+
   final SupabaseClient _supabase;
+  final GoogleAuthClient _googleAuthClient;
 
-  AuthController({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+  Future<AuthResponse> signInWithEmail(String email, String password) =>
+      _supabase.auth.signInWithPassword(email: email, password: password);
 
-  /// Sign in with email and password
-  Future<AuthResponse> signInWithEmail(String email, String password) async {
-    try {
-      debugPrint('Signing in with email: $email');
-      final response = await _supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-      debugPrint('Sign in successful! User: ${response.user?.email}');
-      return response;
-    } catch (e, stack) {
-      debugPrint('Exception during sign in: $e');
-      debugPrint('Stacktrace: $stack');
-      rethrow;
-    }
-  }
+  Future<AuthResponse> signUpWithEmail(String email, String password) =>
+      _supabase.auth.signUp(email: email, password: password);
 
-  /// Sign up with email and password
-  Future<AuthResponse> signUpWithEmail(String email, String password) async {
-    try {
-      debugPrint('Signing up with email: $email');
-      final response = await _supabase.auth.signUp(
-        email: email,
-        password: password,
-      );
-      debugPrint('Sign up successful! User: ${response.user?.email}');
-      return response;
-    } catch (e, stack) {
-      debugPrint('Exception during sign up: $e');
-      debugPrint('Stacktrace: $stack');
-      rethrow;
-    }
-  }
-
-  /// Sign out
   Future<void> signOut() async {
     try {
-      await GoogleSignIn().signOut();
-    } catch (_) {}
+      await _googleAuthClient.signOut();
+    } on Exception {
+      // Supabase sign-out must still run if no native Google session exists.
+    }
     await _supabase.auth.signOut();
   }
 
-  /// Sign in with Google using native plugin
   Future<bool> signInWithGoogle() async {
-    try {
-      debugPrint('Starting native Google sign in...');
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: Env.googleAuthWebClientId,
-      );
+    final authentication = await _googleAuthClient.authenticate();
+    if (authentication == null) return false;
 
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        debugPrint('Google sign in aborted by user');
-        return false;
-      }
-
-      final googleAuth = await googleUser.authentication;
-      final accessToken = googleAuth.accessToken;
-      final idToken = googleAuth.idToken;
-
-      if (idToken == null) {
-        throw 'No ID Token found.';
-      }
-
-      final response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      debugPrint('Google sign in successful! User: ${response.user?.email}');
-      return true;
-    } catch (e, stack) {
-      debugPrint('Exception during native Google sign in: $e');
-      debugPrint('Stacktrace: $stack');
-      rethrow;
+    final idToken = authentication.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const FormatException('Google authentication returned no ID token');
     }
+
+    await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: authentication.accessToken,
+    );
+    return true;
   }
 
-  /// Get current session
   Session? get currentSession => _supabase.auth.currentSession;
-
-  /// Get current user
   User? get currentUser => _supabase.auth.currentUser;
-
-  /// Listen to auth state changes
   Stream<AuthState> get onAuthStateChange => _supabase.auth.onAuthStateChange;
 }
