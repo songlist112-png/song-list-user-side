@@ -56,8 +56,10 @@ class SubscriptionGateController extends StateNotifier<SubscriptionGateState> {
   final SubscriptionRepository _repository;
   final String? Function() _userId;
   final DateTime Function() _clock;
+  Timer? _accessDeadlineTimer;
 
   Future<void> validate() async {
+    _accessDeadlineTimer?.cancel();
     if (state.status != SubscriptionGateStatus.loading) {
       state = const SubscriptionGateState.loading();
     }
@@ -95,6 +97,19 @@ class SubscriptionGateController extends StateNotifier<SubscriptionGateState> {
     }
   }
 
+  Future<void> validateIfNeeded() {
+    if (state.status == SubscriptionGateStatus.loading) {
+      return Future<void>.value();
+    }
+    final entitlement = state.entitlement;
+    if (state.status != SubscriptionGateStatus.entitled ||
+        entitlement == null ||
+        !entitlement.canAccessAt(_clock())) {
+      return validate();
+    }
+    return Future<void>.value();
+  }
+
   void _setEntitlement(SubscriptionEntitlement entitlement) {
     final now = _clock();
     final status = entitlement.canAccessAt(now)
@@ -103,6 +118,23 @@ class SubscriptionGateController extends StateNotifier<SubscriptionGateState> {
         ? SubscriptionGateStatus.expired
         : SubscriptionGateStatus.internetRequired;
     state = SubscriptionGateState(status, entitlement: entitlement);
+    if (status == SubscriptionGateStatus.entitled) {
+      _scheduleAccessDeadline(entitlement, now);
+    }
+  }
+
+  void _scheduleAccessDeadline(
+    SubscriptionEntitlement entitlement,
+    DateTime now,
+  ) {
+    final expiration = entitlement.expiresAt;
+    final deadline = expiration != null &&
+            expiration.isBefore(entitlement.offlineGraceUntil)
+        ? expiration
+        : entitlement.offlineGraceUntil;
+    _accessDeadlineTimer = Timer(deadline.difference(now), () {
+      if (mounted) unawaited(validate());
+    });
   }
 
   bool _isNetworkFailure(Object error) =>
@@ -110,4 +142,10 @@ class SubscriptionGateController extends StateNotifier<SubscriptionGateState> {
       error is TimeoutException ||
       error is HandshakeException ||
       error is HttpException;
+
+  @override
+  void dispose() {
+    _accessDeadlineTimer?.cancel();
+    super.dispose();
+  }
 }

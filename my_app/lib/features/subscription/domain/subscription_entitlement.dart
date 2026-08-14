@@ -27,7 +27,7 @@ class SubscriptionEntitlement {
     if (time.isBefore(lastValidatedAt.subtract(const Duration(minutes: 5)))) {
       return false;
     }
-    return !time.isAfter(offlineGraceUntil);
+    return time.isBefore(offlineGraceUntil);
   }
 
   bool isExpiredAt(DateTime time) {

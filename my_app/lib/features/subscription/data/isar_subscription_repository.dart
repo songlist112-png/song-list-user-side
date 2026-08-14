@@ -12,7 +12,7 @@ class IsarSubscriptionRepository implements SubscriptionRepository {
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
-  static const offlineGracePeriod = Duration(hours: 24);
+  static const offlineGracePeriod = Duration(minutes: 3);
 
   final Isar _isar;
   final SubscriptionRemoteDataSource _remote;
