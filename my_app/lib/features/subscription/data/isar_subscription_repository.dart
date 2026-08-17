@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../database/local/models/subscription.dart';
 import '../domain/subscription_entitlement.dart';

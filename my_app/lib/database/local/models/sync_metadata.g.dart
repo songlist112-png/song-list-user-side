@@ -32,12 +32,9 @@ const SyncMetadataSchema = CollectionSchema(
       name: r'lastSync',
       type: IsarType.dateTime,
     ),
-    r'userId': PropertySchema(
-      id: 3,
-      name: r'userId',
-      type: IsarType.string,
-    )
+    r'userId': PropertySchema(id: 3, name: r'userId', type: IsarType.string),
   },
+
   estimateSize: _syncMetadataEstimateSize,
   serialize: _syncMetadataSerialize,
   deserialize: _syncMetadataDeserialize,
@@ -54,16 +51,17 @@ const SyncMetadataSchema = CollectionSchema(
           name: r'userId',
           type: IndexType.hash,
           caseSensitive: true,
-        )
+        ),
       ],
-    )
+    ),
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _syncMetadataGetId,
   getLinks: _syncMetadataGetLinks,
   attach: _syncMetadataAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _syncMetadataEstimateSize(
@@ -138,7 +136,10 @@ List<IsarLinkBase<dynamic>> _syncMetadataGetLinks(SyncMetadata object) {
 }
 
 void _syncMetadataAttach(
-    IsarCollection<dynamic> col, Id id, SyncMetadata object) {
+  IsarCollection<dynamic> col,
+  Id id,
+  SyncMetadata object,
+) {
   object.id = id;
 }
 
@@ -191,8 +192,10 @@ extension SyncMetadataByIndex on IsarCollection<SyncMetadata> {
     return putAllByIndex(r'userId', objects);
   }
 
-  List<Id> putAllByUserIdSync(List<SyncMetadata> objects,
-      {bool saveLinks = true}) {
+  List<Id> putAllByUserIdSync(
+    List<SyncMetadata> objects, {
+    bool saveLinks = true,
+  }) {
     return putAllByIndexSync(r'userId', objects, saveLinks: saveLinks);
   }
 }
@@ -210,15 +213,13 @@ extension SyncMetadataQueryWhere
     on QueryBuilder<SyncMetadata, SyncMetadata, QWhereClause> {
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idEqualTo(Id id) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: id,
-        upper: id,
-      ));
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idNotEqualTo(
-      Id id) {
+    Id id,
+  ) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
@@ -241,8 +242,9 @@ extension SyncMetadataQueryWhere
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idGreaterThan(
-      Id id,
-      {bool include = false}) {
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.greaterThan(lower: id, includeLower: include),
@@ -250,8 +252,10 @@ extension SyncMetadataQueryWhere
     });
   }
 
-  QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idLessThan(Id id,
-      {bool include = false}) {
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idLessThan(
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.lessThan(upper: id, includeUpper: include),
@@ -266,56 +270,67 @@ extension SyncMetadataQueryWhere
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: lowerId,
-        includeLower: includeLower,
-        upper: upperId,
-        includeUpper: includeUpper,
-      ));
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> userIdEqualTo(
-      String userId) {
+    String userId,
+  ) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'userId',
-        value: [userId],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'userId', value: [userId]),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> userIdNotEqualTo(
-      String userId) {
+    String userId,
+  ) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [],
-              upper: [userId],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [userId],
-              includeLower: false,
-              upper: [],
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [],
+                upper: [userId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [userId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
       } else {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [userId],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [],
-              upper: [userId],
-              includeUpper: false,
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [userId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [],
+                upper: [userId],
+                includeUpper: false,
+              ),
+            );
       }
     });
   }
@@ -324,12 +339,12 @@ extension SyncMetadataQueryWhere
 extension SyncMetadataQueryFilter
     on QueryBuilder<SyncMetadata, SyncMetadata, QFilterCondition> {
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition> idEqualTo(
-      Id value) {
+    Id value,
+  ) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
     });
   }
 
@@ -338,11 +353,13 @@ extension SyncMetadataQueryFilter
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -351,11 +368,13 @@ extension SyncMetadataQueryFilter
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -366,82 +385,87 @@ extension SyncMetadataQueryFilter
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'id',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsNull() {
+  lastErrorIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastError',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastError'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsNotNull() {
+  lastErrorIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastError',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastError'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorEqualTo(
-    String? value, {
-    bool caseSensitive = true,
-  }) {
+  lastErrorEqualTo(String? value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorGreaterThan(
-    String? value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorLessThan(
+  lastErrorGreaterThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorBetween(
+  lastErrorLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  lastErrorBetween(
     String? lower,
     String? upper, {
     bool includeLower = true,
@@ -449,232 +473,232 @@ extension SyncMetadataQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastError',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastError',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  lastErrorStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  lastErrorEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorContains(String value, {bool caseSensitive = true}) {
+  lastErrorContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorMatches(String pattern, {bool caseSensitive = true}) {
+  lastErrorMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'lastError',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'lastError',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsEmpty() {
+  lastErrorIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastError',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastError', value: ''),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsNotEmpty() {
+  lastErrorIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'lastError',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'lastError', value: ''),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtIsNull() {
+  lastSuccessAtIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastSuccessAt',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastSuccessAt'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtIsNotNull() {
+  lastSuccessAtIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastSuccessAt',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastSuccessAt'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtEqualTo(DateTime? value) {
+  lastSuccessAtEqualTo(DateTime? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastSuccessAt',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastSuccessAt', value: value),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtGreaterThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSuccessAtGreaterThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastSuccessAt',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastSuccessAt',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtLessThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSuccessAtLessThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastSuccessAt',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastSuccessAt',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtBetween(
+  lastSuccessAtBetween(
     DateTime? lower,
     DateTime? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastSuccessAt',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastSuccessAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncIsNull() {
+  lastSyncIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastSync',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastSync'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncIsNotNull() {
+  lastSyncIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastSync',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastSync'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncEqualTo(DateTime? value) {
+  lastSyncEqualTo(DateTime? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastSync',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastSync', value: value),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncGreaterThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSyncGreaterThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastSync',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastSync',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncLessThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSyncLessThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastSync',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastSync',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncBetween(
+  lastSyncBetween(
     DateTime? lower,
     DateTime? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastSync',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastSync',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
@@ -683,43 +707,49 @@ extension SyncMetadataQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdGreaterThan(
+  userIdGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdLessThan(
+  userIdLessThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
@@ -731,85 +761,88 @@ extension SyncMetadataQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'userId',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'userId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  userIdStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  userIdEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdContains(String value, {bool caseSensitive = true}) {
+  userIdContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition> userIdMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'userId',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'userId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdIsEmpty() {
+  userIdIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'userId',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'userId', value: ''),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdIsNotEmpty() {
+  userIdIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'userId',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'userId', value: ''),
+      );
     });
   }
 }
@@ -841,7 +874,7 @@ extension SyncMetadataQuerySortBy
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
-      sortByLastSuccessAtDesc() {
+  sortByLastSuccessAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSuccessAt', Sort.desc);
     });
@@ -905,7 +938,7 @@ extension SyncMetadataQuerySortThenBy
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
-      thenByLastSuccessAtDesc() {
+  thenByLastSuccessAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSuccessAt', Sort.desc);
     });
@@ -938,15 +971,16 @@ extension SyncMetadataQuerySortThenBy
 
 extension SyncMetadataQueryWhereDistinct
     on QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> {
-  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByLastError(
-      {bool caseSensitive = true}) {
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByLastError({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastError', caseSensitive: caseSensitive);
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
-      distinctByLastSuccessAt() {
+  distinctByLastSuccessAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastSuccessAt');
     });
@@ -958,8 +992,9 @@ extension SyncMetadataQueryWhereDistinct
     });
   }
 
-  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByUserId(
-      {bool caseSensitive = true}) {
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByUserId({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'userId', caseSensitive: caseSensitive);
     });
@@ -981,7 +1016,7 @@ extension SyncMetadataQueryProperty
   }
 
   QueryBuilder<SyncMetadata, DateTime?, QQueryOperations>
-      lastSuccessAtProperty() {
+  lastSuccessAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastSuccessAt');
     });

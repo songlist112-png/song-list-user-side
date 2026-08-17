@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:my_app/database/local/models/attachment.dart';
 import 'package:my_app/database/local/models/cached_board.dart';
 import 'package:my_app/database/local/models/profile.dart';
