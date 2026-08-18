@@ -194,6 +194,14 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(currentProfileProvider).asData?.value;
+    final syncStatus = ref
+        .watch(syncStatusProvider)
+        .when(
+          data: (status) => status,
+          loading: () => const SyncStatus.checking(),
+          error: (_, _) =>
+              const SyncStatus(phase: SyncPhase.failed, isInitialSync: true),
+        );
     final canCreateBoard = profile != null && profile.role != 'admin';
     final showCreateButton =
         _selectedTabIndex == _mySongsTabIndex && canCreateBoard;
@@ -215,6 +223,8 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
                 child: Column(
                   children: [
                     _BoardTabs(controller: _tabController),
+                    if (syncStatus.isBackgroundSyncing)
+                      const _BackgroundSyncIndicator(),
                     Expanded(
                       child: FutureBuilder<List<SongList>>(
                         future: _boards,
@@ -232,6 +242,12 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
                           }
 
                           final boards = snapshot.data ?? _visibleBoards;
+                          if (_shouldShowInitialSync(syncStatus, boards)) {
+                            return _InitialSyncState(
+                              status: syncStatus,
+                              onRetry: _retryInitialSync,
+                            );
+                          }
 
                           final libraryBoards = boards
                               .where(
@@ -293,9 +309,122 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
     await _boards;
   }
 
+  bool _shouldShowInitialSync(SyncStatus status, List<SongList> boards) =>
+      boards.isEmpty &&
+      status.isInitialSync &&
+      status.phase != SyncPhase.completed;
+
+  Future<void> _retryInitialSync() async {
+    await ref.read(syncServiceProvider).synchronize();
+    if (mounted) _reload();
+  }
+
   Future<void> _openBoard(SongList board) async {
     await context.push('/board/${board.id}');
     if (mounted) _reload();
+  }
+}
+
+class _BackgroundSyncIndicator extends StatelessWidget {
+  const _BackgroundSyncIndicator();
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'Syncing latest changes',
+    child: const LinearProgressIndicator(minHeight: 2),
+  );
+}
+
+class _InitialSyncState extends StatelessWidget {
+  const _InitialSyncState({required this.status, required this.onRetry});
+
+  final SyncStatus status;
+  final Future<void> Function() onRetry;
+
+  bool get _canRetry =>
+      status.phase == SyncPhase.offline || status.phase == SyncPhase.failed;
+
+  String get _title => switch (status.phase) {
+    SyncPhase.offline => 'Waiting for a connection',
+    SyncPhase.failed => "Couldn't load your library",
+    _ => 'Loading your song library',
+  };
+
+  String get _message => switch (status.phase) {
+    SyncPhase.offline =>
+      'Connect to the internet to load your boards and songs.',
+    SyncPhase.failed => 'Check your connection and try again.',
+    _ => 'Syncing boards and songs to this device. This may take a moment.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$_title. $_message',
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SyncStatusGraphic(status: status),
+              const SizedBox(height: 20),
+              Text(
+                _title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.text,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+              ),
+              if (_canRetry) ...[
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncStatusGraphic extends StatelessWidget {
+  const _SyncStatusGraphic({required this.status});
+
+  final SyncStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status.phase == SyncPhase.offline) {
+      return const Icon(
+        Icons.cloud_off_outlined,
+        size: 52,
+        color: AppColors.textMuted,
+      );
+    }
+    if (status.phase == SyncPhase.failed) {
+      return const Icon(
+        Icons.sync_problem_outlined,
+        size: 52,
+        color: AppColors.textMuted,
+      );
+    }
+    return const CircularProgressIndicator(
+      semanticsLabel: 'Loading account data',
+    );
   }
 }
 

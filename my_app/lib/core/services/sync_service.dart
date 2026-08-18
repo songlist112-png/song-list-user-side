@@ -27,6 +27,29 @@ final syncServiceProvider = Provider<SyncService>(
   (_) => throw StateError('SyncService provider was not initialized'),
 );
 
+final syncStatusProvider = StreamProvider<SyncStatus>(
+  (ref) => ref.watch(syncServiceProvider).statusChanges,
+);
+
+enum SyncPhase { idle, checking, synchronizing, completed, offline, failed }
+
+@immutable
+class SyncStatus {
+  const SyncStatus({required this.phase, required this.isInitialSync});
+
+  const SyncStatus.idle() : phase = SyncPhase.idle, isInitialSync = false;
+
+  const SyncStatus.checking()
+    : phase = SyncPhase.checking,
+      isInitialSync = true;
+
+  final SyncPhase phase;
+  final bool isInitialSync;
+
+  bool get isBackgroundSyncing =>
+      phase == SyncPhase.synchronizing && !isInitialSync;
+}
+
 class SyncService {
   SyncService({
     required Isar isar,
@@ -58,8 +81,16 @@ class SyncService {
   DateTime? _retryAt;
   bool _running = false;
   bool _rerunRequested = false;
+  SyncStatus _status = const SyncStatus.checking();
+  final StreamController<SyncStatus> _statusController =
+      StreamController<SyncStatus>.broadcast();
   final Map<String, Future<Uint8List>> _attachmentDownloads = {};
   final Map<String, Future<String?>> _avatarDownloads = {};
+
+  Stream<SyncStatus> get statusChanges async* {
+    yield _status;
+    yield* _statusController.stream;
+  }
 
   Future<void> start() async {
     _connectivitySubscription ??= _connectivity.onConnectivityChanged.listen((
@@ -95,23 +126,41 @@ class SyncService {
     final channel = _realtimeChannel;
     if (channel != null) await Supabase.instance.client.removeChannel(channel);
     _realtimeChannel = null;
+    _setStatus(const SyncStatus.idle());
   }
 
   Future<void> synchronize() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      _setStatus(const SyncStatus.idle());
+      return;
+    }
     if (_running) {
       _rerunRequested = true;
       return;
     }
     _running = true;
     final userId = user.id;
+    var isInitialSync = true;
+    _setStatus(const SyncStatus.checking());
     try {
       await _ensureAuthProfile(user);
-      final connectivity = await _connectivity.checkConnectivity();
-      if (connectivity.contains(ConnectivityResult.none)) return;
-
       final metadata = await _metadataFor(userId);
+      isInitialSync = metadata.lastSuccessAt == null;
+      _setStatus(
+        SyncStatus(
+          phase: SyncPhase.synchronizing,
+          isInitialSync: isInitialSync,
+        ),
+      );
+      final connectivity = await _connectivity.checkConnectivity();
+      if (connectivity.contains(ConnectivityResult.none)) {
+        _setStatus(
+          SyncStatus(phase: SyncPhase.offline, isInitialSync: isInitialSync),
+        );
+        return;
+      }
+
       var pending = await _discardUnauthorizedReorders(
         userId,
         await _pendingFor(userId),
@@ -227,7 +276,13 @@ class SyncService {
         ..lastSuccessAt = DateTime.now().toUtc()
         ..lastError = null;
       await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+      _setStatus(
+        SyncStatus(phase: SyncPhase.completed, isInitialSync: isInitialSync),
+      );
     } catch (error, stackTrace) {
+      _setStatus(
+        SyncStatus(phase: SyncPhase.failed, isInitialSync: isInitialSync),
+      );
       debugPrint('Background sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       final metadata = await _metadataFor(userId)
@@ -240,6 +295,11 @@ class SyncService {
         unawaited(synchronize());
       }
     }
+  }
+
+  void _setStatus(SyncStatus status) {
+    _status = status;
+    _statusController.add(status);
   }
 
   void _subscribeToRemoteChanges() {

@@ -51,16 +51,16 @@ Future<void> main() async {
 
 Future<void> _startBackgroundServices(SyncService syncService) async {
   try {
-    await initializeBackgroundSync();
+    await syncService.start();
   } catch (error, stackTrace) {
-    debugPrint('Background scheduling is unavailable: $error');
+    debugPrint('Initial synchronization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
 
   try {
-    await syncService.start();
+    await initializeBackgroundSync();
   } catch (error, stackTrace) {
-    debugPrint('Initial synchronization failed: $error');
+    debugPrint('Background scheduling is unavailable: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
 }
