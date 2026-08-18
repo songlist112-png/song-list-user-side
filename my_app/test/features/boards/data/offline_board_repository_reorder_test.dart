@@ -100,6 +100,33 @@ void main() {
     },
   );
 
+  test(
+    'moving a song away and back preserves both ordered transitions',
+    () async {
+      final repository = _repository(isar);
+
+      await repository.moveSong('one', 'column-two');
+      await repository.moveSong('one', 'column');
+
+      final restored = await repository.fetchBoard('board');
+      expect(restored.columns[0].songs.map((song) => song.id), [
+        'two',
+        'three',
+        'one',
+      ]);
+      expect(restored.columns[1].songs, isEmpty);
+
+      final queue = await isar.syncQueues.where().findAll();
+      expect(queue.map((item) => item.operation), ['move', 'move']);
+      final finalPayload =
+          jsonDecode(queue.last.payload!) as Map<String, dynamic>;
+      expect(finalPayload['source_column_id'], 'column-two');
+      expect(finalPayload['destination_column_id'], 'column');
+      expect(finalPayload['source_song_ids'], <String>[]);
+      expect(finalPayload['destination_song_ids'], ['two', 'three', 'one']);
+    },
+  );
+
   test('personal lyrics overlay never mutates cached admin song', () async {
     final row = (await isar.cachedBoards.where().findAll()).single;
     final board = BoardCodec.decode(row.document);

@@ -447,7 +447,12 @@ class SupabaseBoardRepository implements BoardRepository {
     final data = await Future.wait([
       _client.from('boards').select().eq('deleted', false).order('created_at'),
       _client.from('columns').select().eq('deleted', false).order('position'),
-      _client.from('songs').select().eq('deleted', false).order('position'),
+      _client
+          .from('songs')
+          .select()
+          .eq('deleted', false)
+          .order('position')
+          .order('id'),
       _client.from('labels').select().eq('deleted', false),
       _client.from('artists').select().eq('deleted', false),
       _client.from('song_labels').select('song_id, label_id'),

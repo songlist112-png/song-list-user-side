@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -22,6 +21,7 @@ import '../../features/songs/domain/personal_song_edit_conflict_resolver.dart';
 import '../../features/support/sync/support_sync_coordinator.dart';
 import '../../shared/models/song_attachment.dart';
 import '../../shared/models/song_list.dart';
+import 'song_arrangement_confirmation.dart';
 
 final syncServiceProvider = Provider<SyncService>(
   (_) => throw StateError('SyncService provider was not initialized'),
@@ -194,6 +194,14 @@ class SyncService {
       } else {
         final remoteBoardsFuture = _remote.fetchBoardGraph();
         final remoteBoards = (await remoteBoardsFuture).cast<SongList>();
+        final pendingArrangement = SongArrangementConfirmation.from(pending);
+        if (!pendingArrangement.isEmpty &&
+            pendingArrangement.matches(remoteBoards)) {
+          await _deleteQueueItems(pendingArrangement.queueIds);
+          pending = pending
+              .where((item) => !pendingArrangement.queueIds.contains(item.id))
+              .toList(growable: false);
+        }
         await _replaceCleanCache(userId, remoteBoards);
         final applied = <SyncQueue>[];
 
@@ -223,14 +231,19 @@ class SyncService {
           }
         }
 
-        // Keep local arrangement until canonical server graph confirms it.
+        // Confirm only the final desired state for each affected column.
+        // Earlier operations in this batch may be valid intermediate steps.
         final canonical = (await _remote.fetchBoardGraph()).cast<SongList>();
-        final rejected = applied
-            .where((item) => !_arrangementMatches(canonical, item))
-            .toList(growable: false);
+        final confirmation = SongArrangementConfirmation.from(applied);
+        final rejectedIds = confirmation.rejectedQueueIds(canonical);
+        final confirmedIds = applied
+            .where((item) => !rejectedIds.contains(item.id))
+            .map((item) => item.id)
+            .toSet();
+        await _deleteQueueItems(confirmedIds);
         final rejectedCurrent = <SyncQueue>[];
-        for (final item in rejected) {
-          final current = await _isar.syncQueues.get(item.id);
+        for (final id in rejectedIds) {
+          final current = await _isar.syncQueues.get(id);
           if (current != null && current.status == 'pending') {
             rejectedCurrent.add(current);
           }
@@ -246,11 +259,7 @@ class SyncService {
           throw StateError('Server did not confirm song arrangement');
         }
 
-        await _isar.writeTxn(
-          () => _isar.syncQueues.deleteAll(
-            applied.map((item) => item.id).toList(growable: false),
-          ),
-        );
+        await _deleteQueueItems(rejectedIds);
         await _supportSync.pull(userId);
         await _settingsSync.pull(userId);
         await _mergePersonalSongEdits(
@@ -571,41 +580,9 @@ class SyncService {
     });
   }
 
-  bool _arrangementMatches(List<SongList> boards, SyncQueue item) {
-    if (item.operation != 'reorder' && item.operation != 'move') return true;
-    final payload = jsonDecode(item.payload!) as Map<String, dynamic>;
-    if (item.operation == 'reorder') {
-      return listEquals(
-        _columnSongIds(boards, payload['column_id'] as String),
-        (payload['ids'] as List).cast<String>(),
-      );
-    }
-    return listEquals(
-          _columnSongIds(boards, payload['source_column_id'] as String),
-          (payload['source_song_ids'] as List).cast<String>(),
-        ) &&
-        listEquals(
-          _columnSongIds(boards, payload['destination_column_id'] as String),
-          (payload['destination_song_ids'] as List).cast<String>(),
-        );
-  }
-
-  List<String> _columnSongIds(List<SongList> boards, String columnId) {
-    for (final board in boards) {
-      for (final column in board.columns) {
-        if (column.id == columnId) {
-          // Reorder uploads are deliberately limited to songs owned by this
-          // account. A shared column may also contain admin songs, whose
-          // positions this user cannot update. Confirm only the subset this
-          // queue item is authorized to arrange.
-          return column.songs
-              .where((song) => song.canEdit)
-              .map((song) => song.id)
-              .toList(growable: false);
-        }
-      }
-    }
-    return const [];
+  Future<void> _deleteQueueItems(Set<int> ids) async {
+    if (ids.isEmpty) return;
+    await _isar.writeTxn(() => _isar.syncQueues.deleteAll(ids.toList()));
   }
 
   Future<bool> _replaceAllCache(String userId, List<SongList> boards) async {

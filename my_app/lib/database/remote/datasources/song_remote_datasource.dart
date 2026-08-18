@@ -8,14 +8,26 @@ import '../../../features/boards/data/board_repository.dart';
 import '../../../shared/utils/media_type.dart';
 import '../../local/models/sync_queue.dart';
 
+typedef ReorderSongsRpc =
+    Future<void> Function({
+      required String columnId,
+      required List<String> ids,
+    });
+
 /// Sole data-network boundary used by background synchronization.
 class SyncRemoteDataSource {
-  SyncRemoteDataSource({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client,
-      _reader = SupabaseBoardRepository(client: client);
+  SyncRemoteDataSource({
+    SupabaseClient? client,
+    ReorderSongsRpc? reorderSongsRpc,
+  }) : // Keep the injectable boundary private while retaining a clear API.
+       // ignore: prefer_initializing_formals
+       _reorderSongsRpc = reorderSongsRpc,
+       _client = client ?? Supabase.instance.client,
+       _reader = SupabaseBoardRepository(client: client);
 
   final SupabaseClient _client;
   final SupabaseBoardRepository _reader;
+  final ReorderSongsRpc? _reorderSongsRpc;
 
   static const _serverTimeRetryDelays = <Duration>[
     Duration(milliseconds: 500),
@@ -124,22 +136,19 @@ class SyncRemoteDataSource {
     required String columnId,
     required List<String> ids,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final injectedRpc = _reorderSongsRpc;
+    if (injectedRpc != null) {
+      await injectedRpc(columnId: columnId, ids: ids);
+      return;
+    }
+    // The canonical board read performed by SyncService is the authoritative
+    // confirmation. PostgREST response decoding can vary between deployed
+    // function versions, so a successful transaction must not be rejected
+    // only because its immediate response has a different runtime shape.
+    await _client.rpc<Object?>(
       'sync_reorder_songs',
       params: {'p_column_id': columnId, 'p_song_ids': ids},
     );
-    final confirmedIds = response.cast<String>();
-    if (!_sameOrder(confirmedIds, ids)) {
-      throw StateError('Server did not confirm song arrangement');
-    }
-  }
-
-  static bool _sameOrder(List<String> first, List<String> second) {
-    if (first.length != second.length) return false;
-    for (var index = 0; index < first.length; index++) {
-      if (first[index] != second[index]) return false;
-    }
-    return true;
   }
 
   Future<void> _upsertSong(Map<String, dynamic> payload) async {
