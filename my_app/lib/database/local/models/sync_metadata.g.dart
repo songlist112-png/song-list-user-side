@@ -17,22 +17,47 @@ const SyncMetadataSchema = CollectionSchema(
   name: r'SyncMetadata',
   id: 1560148770299903314,
   properties: {
-    r'lastError': PropertySchema(
+    r'initialSyncComplete': PropertySchema(
       id: 0,
+      name: r'initialSyncComplete',
+      type: IsarType.bool,
+    ),
+    r'initialSyncUpperBound': PropertySchema(
+      id: 1,
+      name: r'initialSyncUpperBound',
+      type: IsarType.dateTime,
+    ),
+    r'lastError': PropertySchema(
+      id: 2,
       name: r'lastError',
       type: IsarType.string,
     ),
     r'lastSuccessAt': PropertySchema(
-      id: 1,
+      id: 3,
       name: r'lastSuccessAt',
       type: IsarType.dateTime,
     ),
     r'lastSync': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'lastSync',
       type: IsarType.dateTime,
     ),
-    r'userId': PropertySchema(id: 3, name: r'userId', type: IsarType.string),
+    r'songCursorId': PropertySchema(
+      id: 5,
+      name: r'songCursorId',
+      type: IsarType.string,
+    ),
+    r'songCursorUpdatedAt': PropertySchema(
+      id: 6,
+      name: r'songCursorUpdatedAt',
+      type: IsarType.dateTime,
+    ),
+    r'syncVersion': PropertySchema(
+      id: 7,
+      name: r'syncVersion',
+      type: IsarType.long,
+    ),
+    r'userId': PropertySchema(id: 8, name: r'userId', type: IsarType.string),
   },
 
   estimateSize: _syncMetadataEstimateSize,
@@ -76,6 +101,12 @@ int _syncMetadataEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.songCursorId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.userId.length * 3;
   return bytesCount;
 }
@@ -86,10 +117,15 @@ void _syncMetadataSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.lastError);
-  writer.writeDateTime(offsets[1], object.lastSuccessAt);
-  writer.writeDateTime(offsets[2], object.lastSync);
-  writer.writeString(offsets[3], object.userId);
+  writer.writeBool(offsets[0], object.initialSyncComplete);
+  writer.writeDateTime(offsets[1], object.initialSyncUpperBound);
+  writer.writeString(offsets[2], object.lastError);
+  writer.writeDateTime(offsets[3], object.lastSuccessAt);
+  writer.writeDateTime(offsets[4], object.lastSync);
+  writer.writeString(offsets[5], object.songCursorId);
+  writer.writeDateTime(offsets[6], object.songCursorUpdatedAt);
+  writer.writeLong(offsets[7], object.syncVersion);
+  writer.writeString(offsets[8], object.userId);
 }
 
 SyncMetadata _syncMetadataDeserialize(
@@ -100,10 +136,15 @@ SyncMetadata _syncMetadataDeserialize(
 ) {
   final object = SyncMetadata();
   object.id = id;
-  object.lastError = reader.readStringOrNull(offsets[0]);
-  object.lastSuccessAt = reader.readDateTimeOrNull(offsets[1]);
-  object.lastSync = reader.readDateTimeOrNull(offsets[2]);
-  object.userId = reader.readString(offsets[3]);
+  object.initialSyncComplete = reader.readBool(offsets[0]);
+  object.initialSyncUpperBound = reader.readDateTimeOrNull(offsets[1]);
+  object.lastError = reader.readStringOrNull(offsets[2]);
+  object.lastSuccessAt = reader.readDateTimeOrNull(offsets[3]);
+  object.lastSync = reader.readDateTimeOrNull(offsets[4]);
+  object.songCursorId = reader.readStringOrNull(offsets[5]);
+  object.songCursorUpdatedAt = reader.readDateTimeOrNull(offsets[6]);
+  object.syncVersion = reader.readLong(offsets[7]);
+  object.userId = reader.readString(offsets[8]);
   return object;
 }
 
@@ -115,12 +156,22 @@ P _syncMetadataDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 1:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 2:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 3:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 4:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 5:
+      return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -388,6 +439,91 @@ extension SyncMetadataQueryFilter
       return query.addFilterCondition(
         FilterCondition.between(
           property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncCompleteEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'initialSyncComplete', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'initialSyncUpperBound'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'initialSyncUpperBound'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'initialSyncUpperBound',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialSyncUpperBound',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialSyncUpperBound',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialSyncUpperBound',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -702,6 +838,293 @@ extension SyncMetadataQueryFilter
     });
   }
 
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'songCursorId'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'songCursorId'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'songCursorId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'songCursorId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'songCursorId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'songCursorId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'songCursorUpdatedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'songCursorUpdatedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'songCursorUpdatedAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'songCursorUpdatedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'songCursorUpdatedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'songCursorUpdatedAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'syncVersion', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'syncVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'syncVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'syncVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition> userIdEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -855,6 +1278,34 @@ extension SyncMetadataQueryLinks
 
 extension SyncMetadataQuerySortBy
     on QueryBuilder<SyncMetadata, SyncMetadata, QSortBy> {
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncComplete() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncCompleteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncUpperBound() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncUpperBoundDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortByLastError() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastError', Sort.asc);
@@ -892,6 +1343,46 @@ extension SyncMetadataQuerySortBy
     });
   }
 
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortBySongCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySongCursorIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySongCursorUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySongCursorUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortBySyncVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySyncVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortByUserId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'userId', Sort.asc);
@@ -916,6 +1407,34 @@ extension SyncMetadataQuerySortThenBy
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncComplete() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncCompleteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncUpperBound() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncUpperBoundDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.desc);
     });
   }
 
@@ -956,6 +1475,46 @@ extension SyncMetadataQuerySortThenBy
     });
   }
 
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenBySongCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySongCursorIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySongCursorUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySongCursorUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenBySyncVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySyncVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenByUserId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'userId', Sort.asc);
@@ -971,6 +1530,20 @@ extension SyncMetadataQuerySortThenBy
 
 extension SyncMetadataQueryWhereDistinct
     on QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> {
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSyncComplete() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSyncComplete');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSyncUpperBound() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSyncUpperBound');
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByLastError({
     bool caseSensitive = true,
   }) {
@@ -992,6 +1565,27 @@ extension SyncMetadataQueryWhereDistinct
     });
   }
 
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctBySongCursorId({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'songCursorId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctBySongCursorUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'songCursorUpdatedAt');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctBySyncVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'syncVersion');
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByUserId({
     bool caseSensitive = true,
   }) {
@@ -1006,6 +1600,20 @@ extension SyncMetadataQueryProperty
   QueryBuilder<SyncMetadata, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, bool, QQueryOperations>
+  initialSyncCompleteProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSyncComplete');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, DateTime?, QQueryOperations>
+  initialSyncUpperBoundProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSyncUpperBound');
     });
   }
 
@@ -1025,6 +1633,25 @@ extension SyncMetadataQueryProperty
   QueryBuilder<SyncMetadata, DateTime?, QQueryOperations> lastSyncProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastSync');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, String?, QQueryOperations> songCursorIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'songCursorId');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, DateTime?, QQueryOperations>
+  songCursorUpdatedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'songCursorUpdatedAt');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, int, QQueryOperations> syncVersionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'syncVersion');
     });
   }
 

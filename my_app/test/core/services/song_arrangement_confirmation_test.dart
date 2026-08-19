@@ -46,6 +46,13 @@ void main() {
       confirmation.matches(_board(a: ['song-2', 'song-1'], b: [])),
       isTrue,
     );
+    expect(
+      confirmation.matchesOrders({
+        'column-a': ['song-2', 'song-1'],
+        'column-b': <String>[],
+      }),
+      isTrue,
+    );
     expect(confirmation.queueIds, {1, 2});
   });
 

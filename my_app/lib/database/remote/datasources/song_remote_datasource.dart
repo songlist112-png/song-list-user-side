@@ -4,9 +4,9 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../features/boards/data/board_repository.dart';
 import '../../../shared/utils/media_type.dart';
 import '../../local/models/sync_queue.dart';
+import '../models/sync_pull_models.dart';
 
 typedef ReorderSongsRpc =
     Future<void> Function({
@@ -22,11 +22,9 @@ class SyncRemoteDataSource {
   }) : // Keep the injectable boundary private while retaining a clear API.
        // ignore: prefer_initializing_formals
        _reorderSongsRpc = reorderSongsRpc,
-       _client = client ?? Supabase.instance.client,
-       _reader = SupabaseBoardRepository(client: client);
+       _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
-  final SupabaseBoardRepository _reader;
   final ReorderSongsRpc? _reorderSongsRpc;
 
   static const _serverTimeRetryDelays = <Duration>[
@@ -56,7 +54,61 @@ class SyncRemoteDataSource {
     );
   }
 
-  Future<List<dynamic>> fetchBoardGraph() => _reader.fetchBoards();
+  Future<SyncStructureDelta> fetchStructureDelta({
+    required DateTime until,
+    DateTime? since,
+  }) async {
+    final response = await _client.rpc<Map<String, dynamic>>(
+      'sync_pull_structure',
+      params: {
+        'p_since': since?.toUtc().toIso8601String(),
+        'p_until': until.toUtc().toIso8601String(),
+      },
+    );
+    return SyncStructureDelta.fromJson(response);
+  }
+
+  Future<SyncSongPage> fetchSongPage({
+    required DateTime until,
+    required int pageSize,
+    DateTime? since,
+    DateTime? cursorUpdatedAt,
+    String? cursorId,
+  }) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'sync_pull_song_page',
+      params: {
+        'p_since': since?.toUtc().toIso8601String(),
+        'p_until': until.toUtc().toIso8601String(),
+        'p_cursor_updated_at': cursorUpdatedAt?.toUtc().toIso8601String(),
+        'p_cursor_id': cursorId,
+        'p_page_size': pageSize,
+      },
+    );
+    return SyncSongPage.fromJson(response, pageSize: pageSize);
+  }
+
+  Future<Map<String, List<String>>> fetchOwnedSongOrders(
+    Set<String> columnIds,
+  ) async {
+    if (columnIds.isEmpty) return const {};
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw const AuthException('Authentication required');
+    final response = await _client
+        .from('songs')
+        .select('id, column_id')
+        .eq('created_by', userId)
+        .eq('deleted', false)
+        .inFilter('column_id', columnIds.toList())
+        .order('position')
+        .order('id');
+    final result = {for (final id in columnIds) id: <String>[]};
+    for (final item in response as List) {
+      final row = (item as Map).cast<String, dynamic>();
+      result[row['column_id'] as String]?.add(row['id'] as String);
+    }
+    return result;
+  }
 
   Future<List<Map<String, dynamic>>> fetchPersonalSongEdits({
     DateTime? since,

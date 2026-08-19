@@ -53,13 +53,24 @@ class SongArrangementConfirmation {
   final Map<String, _ColumnExpectation> _expectations;
 
   bool get isEmpty => _expectations.isEmpty;
+  Set<String> get columnIds => _expectations.keys.toSet();
 
   bool matches(List<SongList> boards) => rejectedQueueIds(boards).isEmpty;
 
+  bool matchesOrders(Map<String, List<String>> orders) =>
+      rejectedQueueIdsForOrders(orders).isEmpty;
+
   Set<int> rejectedQueueIds(List<SongList> boards) {
+    return rejectedQueueIdsForOrders({
+      for (final columnId in columnIds)
+        columnId: _ownedSongIds(boards, columnId),
+    });
+  }
+
+  Set<int> rejectedQueueIdsForOrders(Map<String, List<String>> orders) {
     final rejected = <int>{};
     for (final entry in _expectations.entries) {
-      final actual = _ownedSongIds(boards, entry.key);
+      final actual = orders[entry.key] ?? const [];
       if (!_sameOrder(actual, entry.value.songIds)) {
         rejected.add(entry.value.queueId);
       }

@@ -50,6 +50,12 @@ void main() {
     );
     await tester.pump();
     boards.add(_libraryBoard());
+    boardChanges.add(null);
+    await tester.pump(const Duration(milliseconds: 130));
+    await tester.pump();
+    expect(find.text('Venue Library'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
     syncStatuses.add(
       const SyncStatus(phase: SyncPhase.completed, isInitialSync: true),
     );

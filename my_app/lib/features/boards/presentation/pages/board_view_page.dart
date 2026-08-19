@@ -11,8 +11,8 @@ import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_column.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
-import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../../songs/data/isar_personal_song_edit_repository.dart';
+import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../../songs/presentation/pages/personal_song_edit_page.dart';
 import '../../application/board_detail_controller.dart';
 import '../../data/board_repository.dart';
@@ -64,7 +64,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(ScreenCaptureProtection.acquire());
+    // unawaited(ScreenCaptureProtection.acquire());
     _songList = SongList(
       id: widget.boardId,
       ownerId: '',
