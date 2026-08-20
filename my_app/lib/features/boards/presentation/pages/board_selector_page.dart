@@ -435,14 +435,14 @@ class _WelcomeHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // final profile = ref.watch(currentProfileProvider).asData?.value;
-    // final fullName = profile?.fullName?.trim();
-    // final email = profile?.email ?? '';
-    // final displayName = fullName != null && fullName.isNotEmpty
-    //     ? fullName
-    //     : email.isNotEmpty
-    //     ? email.split('@').first
-    //     : 'Song List user';
+    final profile = ref.watch(currentProfileProvider).asData?.value;
+    final fullName = profile?.fullName?.trim();
+    final email = profile?.email ?? '';
+    final displayName = fullName != null && fullName.isNotEmpty
+        ? fullName
+        : email.isNotEmpty
+        ? email.split('@').first
+        : 'Song List user';
 
     return SizedBox(
       height: 132,
@@ -456,7 +456,7 @@ class _WelcomeHeader extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Venue Boards',
+                    'Welcome back!',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -466,13 +466,13 @@ class _WelcomeHeader extends ConsumerWidget {
                       letterSpacing: -0.6,
                     ),
                   ),
-                  // const SizedBox(height: 2),
-                  // Text(
-                  //   displayName,
-                  //   maxLines: 1,
-                  //   overflow: TextOverflow.ellipsis,
-                  //   style: const TextStyle(color: Colors.white, fontSize: 16),
-                  // ),
+                  const SizedBox(height: 2),
+                  Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                 ],
               ),
             ),

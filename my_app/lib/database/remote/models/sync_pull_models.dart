@@ -32,18 +32,30 @@ class SyncStructureDelta {
 }
 
 class SyncSongPage {
-  const SyncSongPage({required this.rows, required this.pageSize});
+  const SyncSongPage({
+    required this.rows,
+    required this.pageSize,
+    this.totalCount,
+  });
 
-  factory SyncSongPage.fromJson(Object? json, {required int pageSize}) =>
-      SyncSongPage(
-        rows: (json as List? ?? const [])
-            .map((item) => (item as Map).cast<String, dynamic>())
-            .toList(growable: false),
-        pageSize: pageSize,
-      );
+  factory SyncSongPage.fromJson(Object? json, {required int pageSize}) {
+    final payload = switch (json) {
+      Map() => json.cast<String, dynamic>(),
+      List() => <String, dynamic>{'rows': json},
+      _ => throw const FormatException('Invalid song sync page response'),
+    };
+    return SyncSongPage(
+      rows: (payload['rows'] as List? ?? const [])
+          .map((item) => (item as Map).cast<String, dynamic>())
+          .toList(growable: false),
+      pageSize: pageSize,
+      totalCount: (payload['total_count'] as num?)?.toInt(),
+    );
+  }
 
   final List<Map<String, dynamic>> rows;
   final int pageSize;
+  final int? totalCount;
 
   bool get hasMore => rows.length == pageSize;
   DateTime? get nextUpdatedAt => rows.isEmpty

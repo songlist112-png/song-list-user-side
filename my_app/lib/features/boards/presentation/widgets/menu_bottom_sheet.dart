@@ -163,10 +163,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             title: 'Show Artist',
                             subtitle: 'Display artist names on song cards',
                             value: _showArtist,
-                            onChanged: widget.readOnly
-                                ? null
-                                : (value) =>
-                                      unawaited(_changeShowArtist(value)),
+                            onChanged: (value) =>
+                                unawaited(_changeShowArtist(value)),
                           ),
                           _buildDivider(),
                           _buildSwitchTile(
@@ -174,9 +172,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             title: 'Show BPM',
                             subtitle: 'Display tempo on song cards',
                             value: _showBpm,
-                            onChanged: widget.readOnly
-                                ? null
-                                : (value) => unawaited(_changeShowBpm(value)),
+                            onChanged: (value) =>
+                                unawaited(_changeShowBpm(value)),
                           ),
                           _buildDivider(),
                           _buildSwitchTile(
@@ -184,9 +181,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             title: 'Dark Mode',
                             subtitle: 'Use dark theme colors',
                             value: _darkMode,
-                            onChanged: widget.readOnly
-                                ? null
-                                : (value) => unawaited(_changeDarkMode(value)),
+                            onChanged: (value) =>
+                                unawaited(_changeDarkMode(value)),
                           ),
                         ],
                       ),

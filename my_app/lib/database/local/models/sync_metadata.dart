@@ -25,4 +25,8 @@ class SyncMetadata {
   /// Keyset cursor for the last song page committed to Isar.
   DateTime? songCursorUpdatedAt;
   String? songCursorId;
+
+  /// Resumable counters used by the first-account progress screen.
+  int initialSongsSynced = 0;
+  int? initialSongTotal;
 }

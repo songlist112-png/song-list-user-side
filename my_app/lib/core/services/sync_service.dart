@@ -36,22 +36,40 @@ enum SyncPhase { idle, checking, synchronizing, completed, offline, failed }
 
 @immutable
 class SyncStatus {
-  const SyncStatus({required this.phase, required this.isInitialSync});
+  const SyncStatus({
+    required this.phase,
+    required this.isInitialSync,
+    this.progress,
+    this.syncedSongs = 0,
+    this.totalSongs,
+  });
 
-  const SyncStatus.idle() : phase = SyncPhase.idle, isInitialSync = false;
+  const SyncStatus.idle()
+    : phase = SyncPhase.idle,
+      isInitialSync = false,
+      progress = null,
+      syncedSongs = 0,
+      totalSongs = null;
 
   const SyncStatus.checking()
     : phase = SyncPhase.checking,
-      isInitialSync = true;
+      isInitialSync = true,
+      progress = 0,
+      syncedSongs = 0,
+      totalSongs = null;
 
   final SyncPhase phase;
   final bool isInitialSync;
+  final double? progress;
+  final int syncedSongs;
+  final int? totalSongs;
 
   bool get isBackgroundSyncing => phase == SyncPhase.synchronizing;
+  int get progressPercent => ((progress ?? 0).clamp(0, 1) * 100).round();
 }
 
 class SyncService {
-  static const syncVersion = 1;
+  static const syncVersion = 2;
   static const initialSongBatchSize = 500;
 
   SyncService({
@@ -145,7 +163,6 @@ class SyncService {
     _running = true;
     final userId = user.id;
     var isInitialSync = true;
-    _setStatus(const SyncStatus.checking());
     try {
       await _ensureAuthProfile(user);
       final metadata = await _metadataFor(userId);
@@ -155,12 +172,25 @@ class SyncService {
         SyncStatus(
           phase: SyncPhase.synchronizing,
           isInitialSync: isInitialSync,
+          progress: isInitialSync
+              ? metadata.initialSongTotal == null
+                    ? 0.02
+                    : _initialProgress(metadata)
+              : null,
+          syncedSongs: metadata.initialSongsSynced,
+          totalSongs: metadata.initialSongTotal,
         ),
       );
       final connectivity = await _connectivity.checkConnectivity();
       if (connectivity.contains(ConnectivityResult.none)) {
         _setStatus(
-          SyncStatus(phase: SyncPhase.offline, isInitialSync: isInitialSync),
+          SyncStatus(
+            phase: SyncPhase.offline,
+            isInitialSync: isInitialSync,
+            progress: isInitialSync ? _status.progress : null,
+            syncedSongs: metadata.initialSongsSynced,
+            totalSongs: metadata.initialSongTotal,
+          ),
         );
         return;
       }
@@ -219,11 +249,23 @@ class SyncService {
         ..lastError = null;
       await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
       _setStatus(
-        SyncStatus(phase: SyncPhase.completed, isInitialSync: isInitialSync),
+        SyncStatus(
+          phase: SyncPhase.completed,
+          isInitialSync: isInitialSync,
+          progress: isInitialSync ? 1 : null,
+          syncedSongs: metadata.initialSongsSynced,
+          totalSongs: metadata.initialSongTotal,
+        ),
       );
     } catch (error, stackTrace) {
       _setStatus(
-        SyncStatus(phase: SyncPhase.failed, isInitialSync: isInitialSync),
+        SyncStatus(
+          phase: SyncPhase.failed,
+          isInitialSync: isInitialSync,
+          progress: isInitialSync ? _status.progress : null,
+          syncedSongs: _status.syncedSongs,
+          totalSongs: _status.totalSongs,
+        ),
       );
       debugPrint('Background sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -373,6 +415,8 @@ class SyncService {
       ..initialSyncUpperBound = null
       ..songCursorUpdatedAt = null
       ..songCursorId = null
+      ..initialSongsSynced = 0
+      ..initialSongTotal = null
       ..lastSync = null
       ..lastSuccessAt = null
       ..lastError = null;
@@ -399,6 +443,7 @@ class SyncService {
       structure,
       isInitial: isInitial && !isResumingInitialPage,
     );
+    if (isInitial) _emitInitialProgress(metadata);
     if (isInitial && metadata.initialSyncUpperBound == null) {
       metadata.initialSyncUpperBound = upperBound;
       await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
@@ -421,6 +466,19 @@ class SyncService {
     DateTime upperBound, {
     required bool isInitial,
   }) async {
+    if (isInitial && metadata.initialSongTotal == null) {
+      try {
+        metadata.initialSongTotal = await _remote.fetchVisibleSongCount(
+          until: upperBound,
+        );
+        await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+        _emitInitialProgress(metadata);
+      } on Exception catch (error) {
+        debugPrint(
+          'Initial song count unavailable; using page progress: $error',
+        );
+      }
+    }
     while (true) {
       final page = await _remote.fetchSongPage(
         since: isInitial ? null : metadata.lastSync,
@@ -429,15 +487,54 @@ class SyncService {
         cursorId: metadata.songCursorId,
         pageSize: initialSongBatchSize,
       );
+      if (isInitial && page.totalCount != null) {
+        metadata.initialSongTotal = page.totalCount;
+      }
       await cache.applySongPage(page.rows);
-      if (page.rows.isEmpty) break;
+      if (page.rows.isEmpty) {
+        if (isInitial) {
+          await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+          _emitInitialProgress(metadata);
+        }
+        break;
+      }
       metadata
         ..songCursorUpdatedAt = page.nextUpdatedAt
         ..songCursorId = page.nextId;
+      if (isInitial) metadata.initialSongsSynced += page.rows.length;
       await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+      if (isInitial) _emitInitialProgress(metadata);
       await Future<void>.delayed(Duration.zero);
       if (!page.hasMore) break;
     }
+  }
+
+  void _emitInitialProgress(SyncMetadata metadata) {
+    _setStatus(
+      SyncStatus(
+        phase: SyncPhase.synchronizing,
+        isInitialSync: true,
+        progress: _initialProgress(metadata),
+        syncedSongs: metadata.initialSongsSynced,
+        totalSongs: metadata.initialSongTotal,
+      ),
+    );
+  }
+
+  static double _initialProgress(SyncMetadata metadata) {
+    const structureWeight = 0.08;
+    final total = metadata.initialSongTotal;
+    if (total == null) {
+      final completedBatches =
+          metadata.initialSongsSynced / initialSongBatchSize;
+      return (structureWeight + (completedBatches * 0.12)).clamp(
+        structureWeight,
+        0.92,
+      );
+    }
+    if (total == 0) return 1;
+    final songProgress = (metadata.initialSongsSynced / total).clamp(0, 1);
+    return structureWeight + ((1 - structureWeight) * songProgress);
   }
 
   Future<List<SyncQueue>> _discardConfirmedArrangements(

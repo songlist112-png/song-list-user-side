@@ -32,6 +32,7 @@ class SyncRemoteDataSource {
     Duration(seconds: 1),
     Duration(seconds: 2),
   ];
+  static const _songPageTimeout = Duration(seconds: 45);
 
   Future<DateTime> serverTime() async {
     for (var attempt = 0; ; attempt++) {
@@ -75,18 +76,26 @@ class SyncRemoteDataSource {
     DateTime? cursorUpdatedAt,
     String? cursorId,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
-      'sync_pull_song_page',
-      params: {
-        'p_since': since?.toUtc().toIso8601String(),
-        'p_until': until.toUtc().toIso8601String(),
-        'p_cursor_updated_at': cursorUpdatedAt?.toUtc().toIso8601String(),
-        'p_cursor_id': cursorId,
-        'p_page_size': pageSize,
-      },
-    );
+    final response = await _client
+        .rpc<Object?>(
+          'sync_pull_song_page',
+          params: {
+            'p_since': since?.toUtc().toIso8601String(),
+            'p_until': until.toUtc().toIso8601String(),
+            'p_cursor_updated_at': cursorUpdatedAt?.toUtc().toIso8601String(),
+            'p_cursor_id': cursorId,
+            'p_page_size': pageSize,
+          },
+        )
+        .timeout(_songPageTimeout);
     return SyncSongPage.fromJson(response, pageSize: pageSize);
   }
+
+  Future<int> fetchVisibleSongCount({required DateTime until}) => _client
+      .from('songs')
+      .count()
+      .lte('updated_at', until.toUtc().toIso8601String())
+      .timeout(_songPageTimeout);
 
   Future<Map<String, List<String>>> fetchOwnedSongOrders(
     Set<String> columnIds,

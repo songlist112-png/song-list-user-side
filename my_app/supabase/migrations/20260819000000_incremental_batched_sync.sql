@@ -224,12 +224,25 @@ declare
   v_user_id uuid := auth.uid();
   v_page_size integer := least(greatest(coalesce(p_page_size, 500), 1), 1000);
   v_rows jsonb;
+  v_total_count bigint;
 begin
   if v_user_id is null then
     raise exception 'Authentication required' using errcode = '42501';
   end if;
   if (p_cursor_updated_at is null) <> (p_cursor_id is null) then
     raise exception 'Both cursor values are required' using errcode = '22023';
+  end if;
+
+  if p_since is null and p_cursor_updated_at is null then
+    select count(*)
+    into v_total_count
+    from public.songs
+    where songs.updated_at <= p_until
+      and (songs.created_by = v_user_id or private.is_admin(songs.created_by))
+      and (
+        (p_since is null and not songs.deleted)
+        or (p_since is not null and songs.updated_at > p_since)
+      );
   end if;
 
   with page as (
@@ -284,7 +297,10 @@ begin
   into v_rows
   from page;
 
-  return v_rows;
+  return jsonb_build_object(
+    'rows', v_rows,
+    'total_count', v_total_count
+  );
 end;
 $$;
 

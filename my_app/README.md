@@ -37,7 +37,9 @@ The mobile client uses incremental offline-first synchronization:
 
 - A new account receives boards and columns first, then songs in resumable
   500-record pages. Each page is committed with one bulk Isar transaction so
-  the board UI can be used while remaining pages continue in the background.
+  the authenticated setup screen can show the real server-backed song count
+  from 0–100%. The library opens after every page is available offline, and
+  interrupted progress resumes from the last committed page.
 - Existing accounts request only rows changed or deleted after their last
   successful server watermark. Pagination uses the stable
   `(updated_at, id)` cursor instead of offsets.

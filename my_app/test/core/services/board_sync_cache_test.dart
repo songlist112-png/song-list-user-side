@@ -205,31 +205,49 @@ void main() {
       _songRow('song-1', position: 0, title: 'One'),
       _songRow('song-2', position: 1, title: 'Two'),
     ];
-    final page = SyncSongPage.fromJson(rows, pageSize: 2);
+    final page = SyncSongPage.fromJson({
+      'rows': rows,
+      'total_count': 1250,
+    }, pageSize: 2);
 
     expect(page.hasMore, isTrue);
+    expect(page.totalCount, 1250);
     expect(page.nextId, 'song-2');
     expect(page.nextUpdatedAt, DateTime.utc(2026, 8, 19));
+  });
+
+  test('song page accepts the legacy list response during rollout', () {
+    final page = SyncSongPage.fromJson([
+      _songRow('song-1', position: 0, title: 'One'),
+    ], pageSize: 500);
+
+    expect(page.rows.single['id'], 'song-1');
+    expect(page.totalCount, isNull);
+    expect(page.hasMore, isFalse);
   });
 
   test('sync version and resumable page cursor persist in Isar', () async {
     final metadata = SyncMetadata()
       ..userId = 'user'
-      ..syncVersion = 1
+      ..syncVersion = 2
       ..initialSyncComplete = false
       ..initialSyncUpperBound = DateTime.utc(2026, 8, 19, 1)
       ..songCursorUpdatedAt = DateTime.utc(2026, 8, 19)
-      ..songCursorId = 'song-500';
+      ..songCursorId = 'song-500'
+      ..initialSongsSynced = 500
+      ..initialSongTotal = 1250;
     await isar.writeTxn(() => isar.syncMetadatas.put(metadata));
 
     final restored = await isar.syncMetadatas.getByUserId('user');
-    expect(restored?.syncVersion, 1);
+    expect(restored?.syncVersion, 2);
     expect(restored?.initialSyncComplete, isFalse);
     expect(
       restored?.initialSyncUpperBound?.toUtc(),
       DateTime.utc(2026, 8, 19, 1),
     );
     expect(restored?.songCursorId, 'song-500');
+    expect(restored?.initialSongsSynced, 500);
+    expect(restored?.initialSongTotal, 1250);
   });
 }
 

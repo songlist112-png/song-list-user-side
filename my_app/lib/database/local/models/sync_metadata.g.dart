@@ -17,47 +17,57 @@ const SyncMetadataSchema = CollectionSchema(
   name: r'SyncMetadata',
   id: 1560148770299903314,
   properties: {
-    r'initialSyncComplete': PropertySchema(
+    r'initialSongTotal': PropertySchema(
       id: 0,
+      name: r'initialSongTotal',
+      type: IsarType.long,
+    ),
+    r'initialSongsSynced': PropertySchema(
+      id: 1,
+      name: r'initialSongsSynced',
+      type: IsarType.long,
+    ),
+    r'initialSyncComplete': PropertySchema(
+      id: 2,
       name: r'initialSyncComplete',
       type: IsarType.bool,
     ),
     r'initialSyncUpperBound': PropertySchema(
-      id: 1,
+      id: 3,
       name: r'initialSyncUpperBound',
       type: IsarType.dateTime,
     ),
     r'lastError': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'lastError',
       type: IsarType.string,
     ),
     r'lastSuccessAt': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'lastSuccessAt',
       type: IsarType.dateTime,
     ),
     r'lastSync': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'lastSync',
       type: IsarType.dateTime,
     ),
     r'songCursorId': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'songCursorId',
       type: IsarType.string,
     ),
     r'songCursorUpdatedAt': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'songCursorUpdatedAt',
       type: IsarType.dateTime,
     ),
     r'syncVersion': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'syncVersion',
       type: IsarType.long,
     ),
-    r'userId': PropertySchema(id: 8, name: r'userId', type: IsarType.string),
+    r'userId': PropertySchema(id: 10, name: r'userId', type: IsarType.string),
   },
 
   estimateSize: _syncMetadataEstimateSize,
@@ -117,15 +127,17 @@ void _syncMetadataSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeBool(offsets[0], object.initialSyncComplete);
-  writer.writeDateTime(offsets[1], object.initialSyncUpperBound);
-  writer.writeString(offsets[2], object.lastError);
-  writer.writeDateTime(offsets[3], object.lastSuccessAt);
-  writer.writeDateTime(offsets[4], object.lastSync);
-  writer.writeString(offsets[5], object.songCursorId);
-  writer.writeDateTime(offsets[6], object.songCursorUpdatedAt);
-  writer.writeLong(offsets[7], object.syncVersion);
-  writer.writeString(offsets[8], object.userId);
+  writer.writeLong(offsets[0], object.initialSongTotal);
+  writer.writeLong(offsets[1], object.initialSongsSynced);
+  writer.writeBool(offsets[2], object.initialSyncComplete);
+  writer.writeDateTime(offsets[3], object.initialSyncUpperBound);
+  writer.writeString(offsets[4], object.lastError);
+  writer.writeDateTime(offsets[5], object.lastSuccessAt);
+  writer.writeDateTime(offsets[6], object.lastSync);
+  writer.writeString(offsets[7], object.songCursorId);
+  writer.writeDateTime(offsets[8], object.songCursorUpdatedAt);
+  writer.writeLong(offsets[9], object.syncVersion);
+  writer.writeString(offsets[10], object.userId);
 }
 
 SyncMetadata _syncMetadataDeserialize(
@@ -136,15 +148,17 @@ SyncMetadata _syncMetadataDeserialize(
 ) {
   final object = SyncMetadata();
   object.id = id;
-  object.initialSyncComplete = reader.readBool(offsets[0]);
-  object.initialSyncUpperBound = reader.readDateTimeOrNull(offsets[1]);
-  object.lastError = reader.readStringOrNull(offsets[2]);
-  object.lastSuccessAt = reader.readDateTimeOrNull(offsets[3]);
-  object.lastSync = reader.readDateTimeOrNull(offsets[4]);
-  object.songCursorId = reader.readStringOrNull(offsets[5]);
-  object.songCursorUpdatedAt = reader.readDateTimeOrNull(offsets[6]);
-  object.syncVersion = reader.readLong(offsets[7]);
-  object.userId = reader.readString(offsets[8]);
+  object.initialSongTotal = reader.readLongOrNull(offsets[0]);
+  object.initialSongsSynced = reader.readLong(offsets[1]);
+  object.initialSyncComplete = reader.readBool(offsets[2]);
+  object.initialSyncUpperBound = reader.readDateTimeOrNull(offsets[3]);
+  object.lastError = reader.readStringOrNull(offsets[4]);
+  object.lastSuccessAt = reader.readDateTimeOrNull(offsets[5]);
+  object.lastSync = reader.readDateTimeOrNull(offsets[6]);
+  object.songCursorId = reader.readStringOrNull(offsets[7]);
+  object.songCursorUpdatedAt = reader.readDateTimeOrNull(offsets[8]);
+  object.syncVersion = reader.readLong(offsets[9]);
+  object.userId = reader.readString(offsets[10]);
   return object;
 }
 
@@ -156,22 +170,26 @@ P _syncMetadataDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readBool(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 1:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 3:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 4:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 5:
       return (reader.readStringOrNull(offset)) as P;
+    case 5:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 6:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -439,6 +457,134 @@ extension SyncMetadataQueryFilter
       return query.addFilterCondition(
         FilterCondition.between(
           property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'initialSongTotal'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'initialSongTotal'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'initialSongTotal', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialSongTotal',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialSongTotal',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialSongTotal',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'initialSongsSynced', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialSongsSynced',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialSongsSynced',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialSongsSynced',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -1279,6 +1425,34 @@ extension SyncMetadataQueryLinks
 extension SyncMetadataQuerySortBy
     on QueryBuilder<SyncMetadata, SyncMetadata, QSortBy> {
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongTotal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongTotalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
   sortByInitialSyncComplete() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'initialSyncComplete', Sort.asc);
@@ -1411,6 +1585,34 @@ extension SyncMetadataQuerySortThenBy
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongTotal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongTotalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
   thenByInitialSyncComplete() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'initialSyncComplete', Sort.asc);
@@ -1531,6 +1733,20 @@ extension SyncMetadataQuerySortThenBy
 extension SyncMetadataQueryWhereDistinct
     on QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> {
   QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSongTotal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSongTotal');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSongsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSongsSynced');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
   distinctByInitialSyncComplete() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'initialSyncComplete');
@@ -1600,6 +1816,20 @@ extension SyncMetadataQueryProperty
   QueryBuilder<SyncMetadata, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, int?, QQueryOperations>
+  initialSongTotalProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSongTotal');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, int, QQueryOperations>
+  initialSongsSyncedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSongsSynced');
     });
   }
 
