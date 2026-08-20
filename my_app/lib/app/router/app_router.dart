@@ -9,6 +9,7 @@ import '../../features/support/presentation/pages/help_feedback_page.dart';
 import '../../features/support/presentation/pages/my_tickets_page.dart';
 import '../../features/support/presentation/pages/ticket_details_page.dart';
 import '../../features/subscription/presentation/widgets/subscription_gate.dart';
+import '../../features/sync/presentation/widgets/initial_sync_gate.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -45,7 +46,8 @@ final appRouter = GoRouter(
       ),
     ),
     ShellRoute(
-      builder: (context, state, child) => SubscriptionGate(child: child),
+      builder: (context, state, child) =>
+          InitialSyncGate(child: SubscriptionGate(child: child)),
       routes: [
         GoRoute(
           path: '/',

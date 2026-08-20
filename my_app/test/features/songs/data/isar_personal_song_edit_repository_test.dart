@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:my_app/database/local/models/personal_song_edit.dart';
 import 'package:my_app/database/local/models/sync_queue.dart';
 import 'package:my_app/features/songs/data/isar_personal_song_edit_repository.dart';
@@ -88,14 +88,14 @@ Future<void> _initializeIsarCore() async {
   final config = jsonDecode(await packageConfig.readAsString());
   final packages = config['packages'] as List<dynamic>;
   final package = packages.cast<Map<String, dynamic>>().singleWhere(
-    (item) => item['name'] == 'isar_flutter_libs',
+    (item) => item['name'] == 'isar_community_flutter_libs',
   );
   final rootUri = package['rootUri'] as String;
   final packageRoot = packageConfig.uri.resolve(
     rootUri.endsWith('/') ? rootUri : '$rootUri/',
   );
   final libraryPath = switch (Abi.current()) {
-    Abi.windowsX64 || Abi.windowsArm64 => 'windows/isar.dll',
+    Abi.windowsX64 || Abi.windowsArm64 => 'windows/libisar.dll',
     Abi.linuxX64 => 'linux/libisar.so',
     Abi.macosX64 || Abi.macosArm64 => 'macos/libisar.dylib',
     final abi => throw UnsupportedError('Unsupported Isar test ABI: $abi'),

@@ -9,6 +9,7 @@ import '../../../settings/domain/entities/user_preferences.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../settings/presentation/widgets/text_zoom_control.dart';
 import '../../../songs/presentation/widgets/personal_lyrics_text.dart';
+import '../../../songs/presentation/widgets/protected_lyrics_text.dart';
 
 class SongCardWidget extends StatelessWidget {
   final Song song;
@@ -374,14 +375,18 @@ class _LyricsSectionState extends ConsumerState<_LyricsSection> {
           ],
         ),
         const SizedBox(height: 8),
-        if (hasPersonalEdit)
-          PersonalLyricsText(
-            originalLyrics: song.lyrics ?? '',
-            personalLyrics: song.personalLyrics!,
-            fontSize: fontSize,
-          )
-        else
-          Text(song.lyrics!, style: TextStyle(fontSize: fontSize, height: 1.5)),
+        ProtectedLyricsText(
+          child: hasPersonalEdit
+              ? PersonalLyricsText(
+                  originalLyrics: song.lyrics ?? '',
+                  personalLyrics: song.personalLyrics!,
+                  fontSize: fontSize,
+                )
+              : Text(
+                  song.lyrics!,
+                  style: TextStyle(fontSize: fontSize, height: 1.5),
+                ),
+        ),
       ],
     );
   }

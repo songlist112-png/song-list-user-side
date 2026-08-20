@@ -4,24 +4,35 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../features/boards/data/board_repository.dart';
 import '../../../shared/utils/media_type.dart';
 import '../../local/models/sync_queue.dart';
+import '../models/sync_pull_models.dart';
+
+typedef ReorderSongsRpc =
+    Future<void> Function({
+      required String columnId,
+      required List<String> ids,
+    });
 
 /// Sole data-network boundary used by background synchronization.
 class SyncRemoteDataSource {
-  SyncRemoteDataSource({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client,
-      _reader = SupabaseBoardRepository(client: client);
+  SyncRemoteDataSource({
+    SupabaseClient? client,
+    ReorderSongsRpc? reorderSongsRpc,
+  }) : // Keep the injectable boundary private while retaining a clear API.
+       // ignore: prefer_initializing_formals
+       _reorderSongsRpc = reorderSongsRpc,
+       _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
-  final SupabaseBoardRepository _reader;
+  final ReorderSongsRpc? _reorderSongsRpc;
 
   static const _serverTimeRetryDelays = <Duration>[
     Duration(milliseconds: 500),
     Duration(seconds: 1),
     Duration(seconds: 2),
   ];
+  static const _songPageTimeout = Duration(seconds: 45);
 
   Future<DateTime> serverTime() async {
     for (var attempt = 0; ; attempt++) {
@@ -44,7 +55,69 @@ class SyncRemoteDataSource {
     );
   }
 
-  Future<List<dynamic>> fetchBoardGraph() => _reader.fetchBoards();
+  Future<SyncStructureDelta> fetchStructureDelta({
+    required DateTime until,
+    DateTime? since,
+  }) async {
+    final response = await _client.rpc<Map<String, dynamic>>(
+      'sync_pull_structure',
+      params: {
+        'p_since': since?.toUtc().toIso8601String(),
+        'p_until': until.toUtc().toIso8601String(),
+      },
+    );
+    return SyncStructureDelta.fromJson(response);
+  }
+
+  Future<SyncSongPage> fetchSongPage({
+    required DateTime until,
+    required int pageSize,
+    DateTime? since,
+    DateTime? cursorUpdatedAt,
+    String? cursorId,
+  }) async {
+    final response = await _client
+        .rpc<Object?>(
+          'sync_pull_song_page',
+          params: {
+            'p_since': since?.toUtc().toIso8601String(),
+            'p_until': until.toUtc().toIso8601String(),
+            'p_cursor_updated_at': cursorUpdatedAt?.toUtc().toIso8601String(),
+            'p_cursor_id': cursorId,
+            'p_page_size': pageSize,
+          },
+        )
+        .timeout(_songPageTimeout);
+    return SyncSongPage.fromJson(response, pageSize: pageSize);
+  }
+
+  Future<int> fetchVisibleSongCount({required DateTime until}) => _client
+      .from('songs')
+      .count()
+      .lte('updated_at', until.toUtc().toIso8601String())
+      .timeout(_songPageTimeout);
+
+  Future<Map<String, List<String>>> fetchOwnedSongOrders(
+    Set<String> columnIds,
+  ) async {
+    if (columnIds.isEmpty) return const {};
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw const AuthException('Authentication required');
+    final response = await _client
+        .from('songs')
+        .select('id, column_id')
+        .eq('created_by', userId)
+        .eq('deleted', false)
+        .inFilter('column_id', columnIds.toList())
+        .order('position')
+        .order('id');
+    final result = {for (final id in columnIds) id: <String>[]};
+    for (final item in response as List) {
+      final row = (item as Map).cast<String, dynamic>();
+      result[row['column_id'] as String]?.add(row['id'] as String);
+    }
+    return result;
+  }
 
   Future<List<Map<String, dynamic>>> fetchPersonalSongEdits({
     DateTime? since,
@@ -124,22 +197,19 @@ class SyncRemoteDataSource {
     required String columnId,
     required List<String> ids,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final injectedRpc = _reorderSongsRpc;
+    if (injectedRpc != null) {
+      await injectedRpc(columnId: columnId, ids: ids);
+      return;
+    }
+    // The canonical board read performed by SyncService is the authoritative
+    // confirmation. PostgREST response decoding can vary between deployed
+    // function versions, so a successful transaction must not be rejected
+    // only because its immediate response has a different runtime shape.
+    await _client.rpc<Object?>(
       'sync_reorder_songs',
       params: {'p_column_id': columnId, 'p_song_ids': ids},
     );
-    final confirmedIds = response.cast<String>();
-    if (!_sameOrder(confirmedIds, ids)) {
-      throw StateError('Server did not confirm song arrangement');
-    }
-  }
-
-  static bool _sameOrder(List<String> first, List<String> second) {
-    if (first.length != second.length) return false;
-    for (var index = 0; index < first.length; index++) {
-      if (first[index] != second[index]) return false;
-    }
-    return true;
   }
 
   Future<void> _upsertSong(Map<String, dynamic> payload) async {

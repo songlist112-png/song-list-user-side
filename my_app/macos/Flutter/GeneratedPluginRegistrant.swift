@@ -9,7 +9,7 @@ import app_links
 import connectivity_plus
 import file_picker
 import google_sign_in_ios
-import isar_flutter_libs
+import isar_community_flutter_libs
 import shared_preferences_foundation
 import url_launcher_macos
 

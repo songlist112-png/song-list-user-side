@@ -12,7 +12,7 @@ abstract final class Env {
   );
   static const subscriptionPortalUrl = String.fromEnvironment(
     'SUBSCRIPTION_PORTAL_URL',
-    defaultValue: 'https://song-list-admin-side.vercel.app/user-subs',
+    defaultValue: 'https://song-list-admin-side.vercel.app/user-login',
   );
 
   static List<String> get missingRequiredKeys {

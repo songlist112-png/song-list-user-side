@@ -17,27 +17,59 @@ const SyncMetadataSchema = CollectionSchema(
   name: r'SyncMetadata',
   id: 1560148770299903314,
   properties: {
-    r'lastError': PropertySchema(
+    r'initialSongTotal': PropertySchema(
       id: 0,
+      name: r'initialSongTotal',
+      type: IsarType.long,
+    ),
+    r'initialSongsSynced': PropertySchema(
+      id: 1,
+      name: r'initialSongsSynced',
+      type: IsarType.long,
+    ),
+    r'initialSyncComplete': PropertySchema(
+      id: 2,
+      name: r'initialSyncComplete',
+      type: IsarType.bool,
+    ),
+    r'initialSyncUpperBound': PropertySchema(
+      id: 3,
+      name: r'initialSyncUpperBound',
+      type: IsarType.dateTime,
+    ),
+    r'lastError': PropertySchema(
+      id: 4,
       name: r'lastError',
       type: IsarType.string,
     ),
     r'lastSuccessAt': PropertySchema(
-      id: 1,
+      id: 5,
       name: r'lastSuccessAt',
       type: IsarType.dateTime,
     ),
     r'lastSync': PropertySchema(
-      id: 2,
+      id: 6,
       name: r'lastSync',
       type: IsarType.dateTime,
     ),
-    r'userId': PropertySchema(
-      id: 3,
-      name: r'userId',
+    r'songCursorId': PropertySchema(
+      id: 7,
+      name: r'songCursorId',
       type: IsarType.string,
-    )
+    ),
+    r'songCursorUpdatedAt': PropertySchema(
+      id: 8,
+      name: r'songCursorUpdatedAt',
+      type: IsarType.dateTime,
+    ),
+    r'syncVersion': PropertySchema(
+      id: 9,
+      name: r'syncVersion',
+      type: IsarType.long,
+    ),
+    r'userId': PropertySchema(id: 10, name: r'userId', type: IsarType.string),
   },
+
   estimateSize: _syncMetadataEstimateSize,
   serialize: _syncMetadataSerialize,
   deserialize: _syncMetadataDeserialize,
@@ -54,16 +86,17 @@ const SyncMetadataSchema = CollectionSchema(
           name: r'userId',
           type: IndexType.hash,
           caseSensitive: true,
-        )
+        ),
       ],
-    )
+    ),
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _syncMetadataGetId,
   getLinks: _syncMetadataGetLinks,
   attach: _syncMetadataAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _syncMetadataEstimateSize(
@@ -78,6 +111,12 @@ int _syncMetadataEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.songCursorId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.userId.length * 3;
   return bytesCount;
 }
@@ -88,10 +127,17 @@ void _syncMetadataSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.lastError);
-  writer.writeDateTime(offsets[1], object.lastSuccessAt);
-  writer.writeDateTime(offsets[2], object.lastSync);
-  writer.writeString(offsets[3], object.userId);
+  writer.writeLong(offsets[0], object.initialSongTotal);
+  writer.writeLong(offsets[1], object.initialSongsSynced);
+  writer.writeBool(offsets[2], object.initialSyncComplete);
+  writer.writeDateTime(offsets[3], object.initialSyncUpperBound);
+  writer.writeString(offsets[4], object.lastError);
+  writer.writeDateTime(offsets[5], object.lastSuccessAt);
+  writer.writeDateTime(offsets[6], object.lastSync);
+  writer.writeString(offsets[7], object.songCursorId);
+  writer.writeDateTime(offsets[8], object.songCursorUpdatedAt);
+  writer.writeLong(offsets[9], object.syncVersion);
+  writer.writeString(offsets[10], object.userId);
 }
 
 SyncMetadata _syncMetadataDeserialize(
@@ -102,10 +148,17 @@ SyncMetadata _syncMetadataDeserialize(
 ) {
   final object = SyncMetadata();
   object.id = id;
-  object.lastError = reader.readStringOrNull(offsets[0]);
-  object.lastSuccessAt = reader.readDateTimeOrNull(offsets[1]);
-  object.lastSync = reader.readDateTimeOrNull(offsets[2]);
-  object.userId = reader.readString(offsets[3]);
+  object.initialSongTotal = reader.readLongOrNull(offsets[0]);
+  object.initialSongsSynced = reader.readLong(offsets[1]);
+  object.initialSyncComplete = reader.readBool(offsets[2]);
+  object.initialSyncUpperBound = reader.readDateTimeOrNull(offsets[3]);
+  object.lastError = reader.readStringOrNull(offsets[4]);
+  object.lastSuccessAt = reader.readDateTimeOrNull(offsets[5]);
+  object.lastSync = reader.readDateTimeOrNull(offsets[6]);
+  object.songCursorId = reader.readStringOrNull(offsets[7]);
+  object.songCursorUpdatedAt = reader.readDateTimeOrNull(offsets[8]);
+  object.syncVersion = reader.readLong(offsets[9]);
+  object.userId = reader.readString(offsets[10]);
   return object;
 }
 
@@ -117,12 +170,26 @@ P _syncMetadataDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 1:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 3:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 4:
+      return (reader.readStringOrNull(offset)) as P;
+    case 5:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 7:
+      return (reader.readStringOrNull(offset)) as P;
+    case 8:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -138,7 +205,10 @@ List<IsarLinkBase<dynamic>> _syncMetadataGetLinks(SyncMetadata object) {
 }
 
 void _syncMetadataAttach(
-    IsarCollection<dynamic> col, Id id, SyncMetadata object) {
+  IsarCollection<dynamic> col,
+  Id id,
+  SyncMetadata object,
+) {
   object.id = id;
 }
 
@@ -191,8 +261,10 @@ extension SyncMetadataByIndex on IsarCollection<SyncMetadata> {
     return putAllByIndex(r'userId', objects);
   }
 
-  List<Id> putAllByUserIdSync(List<SyncMetadata> objects,
-      {bool saveLinks = true}) {
+  List<Id> putAllByUserIdSync(
+    List<SyncMetadata> objects, {
+    bool saveLinks = true,
+  }) {
     return putAllByIndexSync(r'userId', objects, saveLinks: saveLinks);
   }
 }
@@ -210,15 +282,13 @@ extension SyncMetadataQueryWhere
     on QueryBuilder<SyncMetadata, SyncMetadata, QWhereClause> {
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idEqualTo(Id id) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: id,
-        upper: id,
-      ));
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idNotEqualTo(
-      Id id) {
+    Id id,
+  ) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
@@ -241,8 +311,9 @@ extension SyncMetadataQueryWhere
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idGreaterThan(
-      Id id,
-      {bool include = false}) {
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.greaterThan(lower: id, includeLower: include),
@@ -250,8 +321,10 @@ extension SyncMetadataQueryWhere
     });
   }
 
-  QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idLessThan(Id id,
-      {bool include = false}) {
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> idLessThan(
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.lessThan(upper: id, includeUpper: include),
@@ -266,56 +339,67 @@ extension SyncMetadataQueryWhere
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: lowerId,
-        includeLower: includeLower,
-        upper: upperId,
-        includeUpper: includeUpper,
-      ));
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> userIdEqualTo(
-      String userId) {
+    String userId,
+  ) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'userId',
-        value: [userId],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'userId', value: [userId]),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterWhereClause> userIdNotEqualTo(
-      String userId) {
+    String userId,
+  ) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [],
-              upper: [userId],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [userId],
-              includeLower: false,
-              upper: [],
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [],
+                upper: [userId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [userId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
       } else {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [userId],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'userId',
-              lower: [],
-              upper: [userId],
-              includeUpper: false,
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [userId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'userId',
+                lower: [],
+                upper: [userId],
+                includeUpper: false,
+              ),
+            );
       }
     });
   }
@@ -324,12 +408,12 @@ extension SyncMetadataQueryWhere
 extension SyncMetadataQueryFilter
     on QueryBuilder<SyncMetadata, SyncMetadata, QFilterCondition> {
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition> idEqualTo(
-      Id value) {
+    Id value,
+  ) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
     });
   }
 
@@ -338,11 +422,13 @@ extension SyncMetadataQueryFilter
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -351,11 +437,13 @@ extension SyncMetadataQueryFilter
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -366,82 +454,300 @@ extension SyncMetadataQueryFilter
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'id',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsNull() {
+  initialSongTotalIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastError',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'initialSongTotal'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsNotNull() {
+  initialSongTotalIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastError',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'initialSongTotal'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorEqualTo(
-    String? value, {
-    bool caseSensitive = true,
+  initialSongTotalEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'initialSongTotal', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialSongTotal',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialSongTotal',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongTotalBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialSongTotal',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorGreaterThan(
+  initialSongsSyncedEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'initialSongsSynced', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialSongsSynced',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialSongsSynced',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSongsSyncedBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialSongsSynced',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncCompleteEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'initialSyncComplete', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'initialSyncUpperBound'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'initialSyncUpperBound'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'initialSyncUpperBound',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialSyncUpperBound',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialSyncUpperBound',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  initialSyncUpperBoundBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialSyncUpperBound',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  lastErrorIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastError'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  lastErrorIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastError'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  lastErrorEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  lastErrorGreaterThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorLessThan(
+  lastErrorLessThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorBetween(
+  lastErrorBetween(
     String? lower,
     String? upper, {
     bool includeLower = true,
@@ -449,232 +755,519 @@ extension SyncMetadataQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastError',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastError',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  lastErrorStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  lastErrorEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorContains(String value, {bool caseSensitive = true}) {
+  lastErrorContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'lastError',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'lastError',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorMatches(String pattern, {bool caseSensitive = true}) {
+  lastErrorMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'lastError',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'lastError',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsEmpty() {
+  lastErrorIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastError',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastError', value: ''),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastErrorIsNotEmpty() {
+  lastErrorIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'lastError',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'lastError', value: ''),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtIsNull() {
+  lastSuccessAtIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastSuccessAt',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastSuccessAt'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtIsNotNull() {
+  lastSuccessAtIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastSuccessAt',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastSuccessAt'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtEqualTo(DateTime? value) {
+  lastSuccessAtEqualTo(DateTime? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastSuccessAt',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastSuccessAt', value: value),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtGreaterThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSuccessAtGreaterThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastSuccessAt',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastSuccessAt',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtLessThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSuccessAtLessThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastSuccessAt',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastSuccessAt',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSuccessAtBetween(
+  lastSuccessAtBetween(
     DateTime? lower,
     DateTime? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastSuccessAt',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastSuccessAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncIsNull() {
+  lastSyncIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastSync',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastSync'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncIsNotNull() {
+  lastSyncIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastSync',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastSync'),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncEqualTo(DateTime? value) {
+  lastSyncEqualTo(DateTime? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastSync',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastSync', value: value),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncGreaterThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSyncGreaterThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastSync',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastSync',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncLessThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastSyncLessThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastSync',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastSync',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      lastSyncBetween(
+  lastSyncBetween(
     DateTime? lower,
     DateTime? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastSync',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastSync',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'songCursorId'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'songCursorId'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'songCursorId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'songCursorId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'songCursorId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'songCursorId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'songCursorId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'songCursorUpdatedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'songCursorUpdatedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'songCursorUpdatedAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'songCursorUpdatedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'songCursorUpdatedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  songCursorUpdatedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'songCursorUpdatedAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'syncVersion', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'syncVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'syncVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
+  syncVersionBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'syncVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
@@ -683,43 +1276,49 @@ extension SyncMetadataQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdGreaterThan(
+  userIdGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdLessThan(
+  userIdLessThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
@@ -731,85 +1330,88 @@ extension SyncMetadataQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'userId',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'userId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  userIdStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  userIdEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdContains(String value, {bool caseSensitive = true}) {
+  userIdContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'userId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'userId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition> userIdMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'userId',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'userId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdIsEmpty() {
+  userIdIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'userId',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'userId', value: ''),
+      );
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterFilterCondition>
-      userIdIsNotEmpty() {
+  userIdIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'userId',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'userId', value: ''),
+      );
     });
   }
 }
@@ -822,6 +1424,62 @@ extension SyncMetadataQueryLinks
 
 extension SyncMetadataQuerySortBy
     on QueryBuilder<SyncMetadata, SyncMetadata, QSortBy> {
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongTotal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongTotalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSongsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncComplete() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncCompleteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncUpperBound() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortByInitialSyncUpperBoundDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortByLastError() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastError', Sort.asc);
@@ -841,7 +1499,7 @@ extension SyncMetadataQuerySortBy
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
-      sortByLastSuccessAtDesc() {
+  sortByLastSuccessAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSuccessAt', Sort.desc);
     });
@@ -856,6 +1514,46 @@ extension SyncMetadataQuerySortBy
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortByLastSyncDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSync', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortBySongCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySongCursorIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySongCursorUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySongCursorUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> sortBySyncVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  sortBySyncVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.desc);
     });
   }
 
@@ -886,6 +1584,62 @@ extension SyncMetadataQuerySortThenBy
     });
   }
 
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongTotal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongTotalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongTotal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSongsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSongsSynced', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncComplete() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncCompleteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncComplete', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncUpperBound() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenByInitialSyncUpperBoundDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialSyncUpperBound', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenByLastError() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastError', Sort.asc);
@@ -905,7 +1659,7 @@ extension SyncMetadataQuerySortThenBy
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
-      thenByLastSuccessAtDesc() {
+  thenByLastSuccessAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSuccessAt', Sort.desc);
     });
@@ -920,6 +1674,46 @@ extension SyncMetadataQuerySortThenBy
   QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenByLastSyncDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSync', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenBySongCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySongCursorIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySongCursorUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySongCursorUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'songCursorUpdatedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy> thenBySyncVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QAfterSortBy>
+  thenBySyncVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncVersion', Sort.desc);
     });
   }
 
@@ -938,15 +1732,44 @@ extension SyncMetadataQuerySortThenBy
 
 extension SyncMetadataQueryWhereDistinct
     on QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> {
-  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByLastError(
-      {bool caseSensitive = true}) {
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSongTotal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSongTotal');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSongsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSongsSynced');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSyncComplete() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSyncComplete');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctByInitialSyncUpperBound() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialSyncUpperBound');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByLastError({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastError', caseSensitive: caseSensitive);
     });
   }
 
   QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
-      distinctByLastSuccessAt() {
+  distinctByLastSuccessAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastSuccessAt');
     });
@@ -958,8 +1781,30 @@ extension SyncMetadataQueryWhereDistinct
     });
   }
 
-  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByUserId(
-      {bool caseSensitive = true}) {
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctBySongCursorId({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'songCursorId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct>
+  distinctBySongCursorUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'songCursorUpdatedAt');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctBySyncVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'syncVersion');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, SyncMetadata, QDistinct> distinctByUserId({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'userId', caseSensitive: caseSensitive);
     });
@@ -974,6 +1819,34 @@ extension SyncMetadataQueryProperty
     });
   }
 
+  QueryBuilder<SyncMetadata, int?, QQueryOperations>
+  initialSongTotalProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSongTotal');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, int, QQueryOperations>
+  initialSongsSyncedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSongsSynced');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, bool, QQueryOperations>
+  initialSyncCompleteProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSyncComplete');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, DateTime?, QQueryOperations>
+  initialSyncUpperBoundProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialSyncUpperBound');
+    });
+  }
+
   QueryBuilder<SyncMetadata, String?, QQueryOperations> lastErrorProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastError');
@@ -981,7 +1854,7 @@ extension SyncMetadataQueryProperty
   }
 
   QueryBuilder<SyncMetadata, DateTime?, QQueryOperations>
-      lastSuccessAtProperty() {
+  lastSuccessAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastSuccessAt');
     });
@@ -990,6 +1863,25 @@ extension SyncMetadataQueryProperty
   QueryBuilder<SyncMetadata, DateTime?, QQueryOperations> lastSyncProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastSync');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, String?, QQueryOperations> songCursorIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'songCursorId');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, DateTime?, QQueryOperations>
+  songCursorUpdatedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'songCursorUpdatedAt');
+    });
+  }
+
+  QueryBuilder<SyncMetadata, int, QQueryOperations> syncVersionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'syncVersion');
     });
   }
 

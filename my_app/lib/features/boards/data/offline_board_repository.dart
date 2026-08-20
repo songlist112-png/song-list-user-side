@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../database/local/models/cached_board.dart';
@@ -139,6 +139,7 @@ class OfflineBoardRepository implements BoardRepository {
       await _isar.cachedBoards.delete(row.id);
       await _putQueue('boards', id, 'delete', const {});
     });
+    onSyncNeeded?.call();
   }
 
   @override
@@ -557,6 +558,7 @@ class OfflineBoardRepository implements BoardRepository {
       await _isar.cachedBoards.put(row);
       await _putQueue(entityType, entityId, operation, payload);
     });
+    onSyncNeeded?.call();
   }
 
   Future<void> _putQueue(

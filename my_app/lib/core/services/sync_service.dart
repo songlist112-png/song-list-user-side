@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -22,12 +21,57 @@ import '../../features/songs/domain/personal_song_edit_conflict_resolver.dart';
 import '../../features/support/sync/support_sync_coordinator.dart';
 import '../../shared/models/song_attachment.dart';
 import '../../shared/models/song_list.dart';
+import 'board_sync_cache.dart';
+import 'song_arrangement_confirmation.dart';
 
 final syncServiceProvider = Provider<SyncService>(
   (_) => throw StateError('SyncService provider was not initialized'),
 );
 
+final syncStatusProvider = StreamProvider<SyncStatus>(
+  (ref) => ref.watch(syncServiceProvider).statusChanges,
+);
+
+enum SyncPhase { idle, checking, synchronizing, completed, offline, failed }
+
+@immutable
+class SyncStatus {
+  const SyncStatus({
+    required this.phase,
+    required this.isInitialSync,
+    this.progress,
+    this.syncedSongs = 0,
+    this.totalSongs,
+  });
+
+  const SyncStatus.idle()
+    : phase = SyncPhase.idle,
+      isInitialSync = false,
+      progress = null,
+      syncedSongs = 0,
+      totalSongs = null;
+
+  const SyncStatus.checking()
+    : phase = SyncPhase.checking,
+      isInitialSync = true,
+      progress = 0,
+      syncedSongs = 0,
+      totalSongs = null;
+
+  final SyncPhase phase;
+  final bool isInitialSync;
+  final double? progress;
+  final int syncedSongs;
+  final int? totalSongs;
+
+  bool get isBackgroundSyncing => phase == SyncPhase.synchronizing;
+  int get progressPercent => ((progress ?? 0).clamp(0, 1) * 100).round();
+}
+
 class SyncService {
+  static const syncVersion = 2;
+  static const initialSongBatchSize = 500;
+
   SyncService({
     required Isar isar,
     SyncRemoteDataSource? remote,
@@ -58,8 +102,16 @@ class SyncService {
   DateTime? _retryAt;
   bool _running = false;
   bool _rerunRequested = false;
+  SyncStatus _status = const SyncStatus.checking();
+  final StreamController<SyncStatus> _statusController =
+      StreamController<SyncStatus>.broadcast();
   final Map<String, Future<Uint8List>> _attachmentDownloads = {};
   final Map<String, Future<String?>> _avatarDownloads = {};
+
+  Stream<SyncStatus> get statusChanges async* {
+    yield _status;
+    yield* _statusController.stream;
+  }
 
   Future<void> start() async {
     _connectivitySubscription ??= _connectivity.onConnectivityChanged.listen((
@@ -95,33 +147,63 @@ class SyncService {
     final channel = _realtimeChannel;
     if (channel != null) await Supabase.instance.client.removeChannel(channel);
     _realtimeChannel = null;
+    _setStatus(const SyncStatus.idle());
   }
 
   Future<void> synchronize() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      _setStatus(const SyncStatus.idle());
+      return;
+    }
     if (_running) {
       _rerunRequested = true;
       return;
     }
     _running = true;
     final userId = user.id;
+    var isInitialSync = true;
     try {
       await _ensureAuthProfile(user);
-      final connectivity = await _connectivity.checkConnectivity();
-      if (connectivity.contains(ConnectivityResult.none)) return;
-
       final metadata = await _metadataFor(userId);
+      await _prepareSyncMetadata(metadata);
+      isInitialSync = !metadata.initialSyncComplete;
+      _setStatus(
+        SyncStatus(
+          phase: SyncPhase.synchronizing,
+          isInitialSync: isInitialSync,
+          progress: isInitialSync
+              ? metadata.initialSongTotal == null
+                    ? 0.02
+                    : _initialProgress(metadata)
+              : null,
+          syncedSongs: metadata.initialSongsSynced,
+          totalSongs: metadata.initialSongTotal,
+        ),
+      );
+      final connectivity = await _connectivity.checkConnectivity();
+      if (connectivity.contains(ConnectivityResult.none)) {
+        _setStatus(
+          SyncStatus(
+            phase: SyncPhase.offline,
+            isInitialSync: isInitialSync,
+            progress: isInitialSync ? _status.progress : null,
+            syncedSongs: metadata.initialSongsSynced,
+            totalSongs: metadata.initialSongTotal,
+          ),
+        );
+        return;
+      }
+
       var pending = await _discardUnauthorizedReorders(
         userId,
         await _pendingFor(userId),
       );
       // Capture watermark before reads so changes racing this pull remain
       // strictly newer and are collected by the next incremental sync.
-      final preparationFuture = Future.wait<Object?>([
-        _remote.serverTime(),
-        _syncProfile(userId),
-      ]);
+      final serverWatermark = await _remote.serverTime();
+      await _syncProfile(userId);
+      var completedWatermark = serverWatermark;
       final remoteEdits = await _remote.fetchPersonalSongEdits(
         since: metadata.lastSync,
       );
@@ -135,73 +217,17 @@ class SyncService {
           metadata.lastSync == null ||
           pending.isNotEmpty ||
           await _remote.hasChangesSince(metadata.lastSync!);
-      if (pending.isEmpty) {
-        if (remoteChanged) {
-          final remoteBoardsFuture = _remote.fetchBoardGraph();
-          final remoteBoards = (await remoteBoardsFuture).cast<SongList>();
-          final replaced = await _replaceAllCache(userId, remoteBoards);
-          if (!replaced) _rerunRequested = true;
-        }
-      } else {
-        final remoteBoardsFuture = _remote.fetchBoardGraph();
-        final remoteBoards = (await remoteBoardsFuture).cast<SongList>();
-        await _replaceCleanCache(userId, remoteBoards);
-        final applied = <SyncQueue>[];
-
-        for (final item in pending) {
-          final nextAttempt = item.nextAttemptAt;
-          if (nextAttempt != null &&
-              nextAttempt.isAfter(DateTime.now().toUtc())) {
-            _scheduleRetry(nextAttempt);
-            continue;
-          }
-          try {
-            if (_supportSync.handles(item)) {
-              await _supportSync.apply(item);
-            } else if (_settingsSync.handles(item)) {
-              await _settingsSync.apply(item);
-            } else {
-              await _remote.apply(item);
-            }
-            applied.add(item);
-          } catch (error, stackTrace) {
-            debugPrint(
-              'Sync upload failed for ${item.entityType}/${item.entityId}: $error',
-            );
-            debugPrintStack(stackTrace: stackTrace);
-            await _recordRetry(item, error);
-            rethrow;
-          }
-        }
-
-        // Keep local arrangement until canonical server graph confirms it.
-        final canonical = (await _remote.fetchBoardGraph()).cast<SongList>();
-        final rejected = applied
-            .where((item) => !_arrangementMatches(canonical, item))
-            .toList(growable: false);
-        final rejectedCurrent = <SyncQueue>[];
-        for (final item in rejected) {
-          final current = await _isar.syncQueues.get(item.id);
-          if (current != null && current.status == 'pending') {
-            rejectedCurrent.add(current);
-          }
-        }
-        if (rejectedCurrent.isNotEmpty) {
-          for (final item in rejectedCurrent) {
-            await _recordRetry(
-              item,
-              StateError('Server did not confirm song arrangement'),
-            );
-          }
-          await _replaceCleanCache(userId, canonical);
-          throw StateError('Server did not confirm song arrangement');
-        }
-
-        await _isar.writeTxn(
-          () => _isar.syncQueues.deleteAll(
-            applied.map((item) => item.id).toList(growable: false),
-          ),
+      if (remoteChanged) {
+        completedWatermark = await _pullBoardChanges(
+          userId,
+          metadata,
+          serverWatermark,
         );
+      }
+      if (pending.isNotEmpty) {
+        pending = await _discardConfirmedArrangements(pending);
+        final applied = await _applyPending(pending);
+        await _confirmAppliedArrangements(applied);
         await _supportSync.pull(userId);
         await _settingsSync.pull(userId);
         await _mergePersonalSongEdits(
@@ -214,20 +240,33 @@ class SyncService {
           _retryTimer?.cancel();
           _retryTimer = null;
           _retryAt = null;
-          final replaced = await _replaceAllCache(userId, canonical);
-          if (!replaced) _rerunRequested = true;
-        } else {
-          await _replaceCleanCache(userId, canonical);
         }
+        if (applied.isNotEmpty) _rerunRequested = true;
       }
-      final preparation = await preparationFuture;
-      final watermark = preparation.first! as DateTime;
       metadata
-        ..lastSync = watermark
+        ..lastSync = metadata.initialSyncComplete ? completedWatermark : null
         ..lastSuccessAt = DateTime.now().toUtc()
         ..lastError = null;
       await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+      _setStatus(
+        SyncStatus(
+          phase: SyncPhase.completed,
+          isInitialSync: isInitialSync,
+          progress: isInitialSync ? 1 : null,
+          syncedSongs: metadata.initialSongsSynced,
+          totalSongs: metadata.initialSongTotal,
+        ),
+      );
     } catch (error, stackTrace) {
+      _setStatus(
+        SyncStatus(
+          phase: SyncPhase.failed,
+          isInitialSync: isInitialSync,
+          progress: isInitialSync ? _status.progress : null,
+          syncedSongs: _status.syncedSongs,
+          totalSongs: _status.totalSongs,
+        ),
+      );
       debugPrint('Background sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       final metadata = await _metadataFor(userId)
@@ -242,6 +281,11 @@ class SyncService {
     }
   }
 
+  void _setStatus(SyncStatus status) {
+    _status = status;
+    _statusController.add(status);
+  }
+
   void _subscribeToRemoteChanges() {
     if (_realtimeChannel != null) return;
     _realtimeChannel = Supabase.instance.client
@@ -249,7 +293,37 @@ class SyncService {
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
+          table: 'boards',
+          callback: (_) => unawaited(synchronize()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'columns',
+          callback: (_) => unawaited(synchronize()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
           table: 'songs',
+          callback: (_) => unawaited(synchronize()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'labels',
+          callback: (_) => unawaited(synchronize()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'artists',
+          callback: (_) => unawaited(synchronize()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'attachments',
           callback: (_) => unawaited(synchronize()),
         )
         .onPostgresChanges(
@@ -332,6 +406,207 @@ class SyncService {
   Future<SyncMetadata> _metadataFor(String userId) async =>
       await _isar.syncMetadatas.filter().userIdEqualTo(userId).findFirst() ??
       (SyncMetadata()..userId = userId);
+
+  Future<void> _prepareSyncMetadata(SyncMetadata metadata) async {
+    if (metadata.syncVersion == syncVersion) return;
+    metadata
+      ..syncVersion = syncVersion
+      ..initialSyncComplete = false
+      ..initialSyncUpperBound = null
+      ..songCursorUpdatedAt = null
+      ..songCursorId = null
+      ..initialSongsSynced = 0
+      ..initialSongTotal = null
+      ..lastSync = null
+      ..lastSuccessAt = null
+      ..lastError = null;
+    await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+  }
+
+  Future<DateTime> _pullBoardChanges(
+    String userId,
+    SyncMetadata metadata,
+    DateTime serverWatermark,
+  ) async {
+    final isInitial = !metadata.initialSyncComplete;
+    final upperBound = isInitial
+        ? metadata.initialSyncUpperBound ?? serverWatermark
+        : serverWatermark;
+    final cache = BoardSyncCache(isar: _isar, userId: userId);
+    final isResumingInitialPage =
+        isInitial && metadata.songCursorUpdatedAt != null;
+    final structure = await _remote.fetchStructureDelta(
+      since: isInitial ? null : metadata.lastSync,
+      until: upperBound,
+    );
+    await cache.applyStructure(
+      structure,
+      isInitial: isInitial && !isResumingInitialPage,
+    );
+    if (isInitial) _emitInitialProgress(metadata);
+    if (isInitial && metadata.initialSyncUpperBound == null) {
+      metadata.initialSyncUpperBound = upperBound;
+      await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+    }
+
+    await _pullSongPages(cache, metadata, upperBound, isInitial: isInitial);
+    metadata
+      ..initialSyncComplete = true
+      ..initialSyncUpperBound = null
+      ..songCursorUpdatedAt = null
+      ..songCursorId = null;
+    await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+    if (upperBound.isBefore(serverWatermark)) _rerunRequested = true;
+    return upperBound;
+  }
+
+  Future<void> _pullSongPages(
+    BoardSyncCache cache,
+    SyncMetadata metadata,
+    DateTime upperBound, {
+    required bool isInitial,
+  }) async {
+    if (isInitial && metadata.initialSongTotal == null) {
+      try {
+        metadata.initialSongTotal = await _remote.fetchVisibleSongCount(
+          until: upperBound,
+        );
+        await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+        _emitInitialProgress(metadata);
+      } on Exception catch (error) {
+        debugPrint(
+          'Initial song count unavailable; using page progress: $error',
+        );
+      }
+    }
+    while (true) {
+      final page = await _remote.fetchSongPage(
+        since: isInitial ? null : metadata.lastSync,
+        until: upperBound,
+        cursorUpdatedAt: metadata.songCursorUpdatedAt,
+        cursorId: metadata.songCursorId,
+        pageSize: initialSongBatchSize,
+      );
+      if (isInitial && page.totalCount != null) {
+        metadata.initialSongTotal = page.totalCount;
+      }
+      await cache.applySongPage(page.rows);
+      if (page.rows.isEmpty) {
+        if (isInitial) {
+          await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+          _emitInitialProgress(metadata);
+        }
+        break;
+      }
+      metadata
+        ..songCursorUpdatedAt = page.nextUpdatedAt
+        ..songCursorId = page.nextId;
+      if (isInitial) metadata.initialSongsSynced += page.rows.length;
+      await _isar.writeTxn(() => _isar.syncMetadatas.put(metadata));
+      if (isInitial) _emitInitialProgress(metadata);
+      await Future<void>.delayed(Duration.zero);
+      if (!page.hasMore) break;
+    }
+  }
+
+  void _emitInitialProgress(SyncMetadata metadata) {
+    _setStatus(
+      SyncStatus(
+        phase: SyncPhase.synchronizing,
+        isInitialSync: true,
+        progress: _initialProgress(metadata),
+        syncedSongs: metadata.initialSongsSynced,
+        totalSongs: metadata.initialSongTotal,
+      ),
+    );
+  }
+
+  static double _initialProgress(SyncMetadata metadata) {
+    const structureWeight = 0.08;
+    final total = metadata.initialSongTotal;
+    if (total == null) {
+      final completedBatches =
+          metadata.initialSongsSynced / initialSongBatchSize;
+      return (structureWeight + (completedBatches * 0.12)).clamp(
+        structureWeight,
+        0.92,
+      );
+    }
+    if (total == 0) return 1;
+    final songProgress = (metadata.initialSongsSynced / total).clamp(0, 1);
+    return structureWeight + ((1 - structureWeight) * songProgress);
+  }
+
+  Future<List<SyncQueue>> _discardConfirmedArrangements(
+    List<SyncQueue> pending,
+  ) async {
+    final confirmation = SongArrangementConfirmation.from(pending);
+    if (confirmation.isEmpty) return pending;
+    final orders = await _remote.fetchOwnedSongOrders(confirmation.columnIds);
+    if (!confirmation.matchesOrders(orders)) return pending;
+    await _deleteQueueItems(confirmation.queueIds);
+    return pending
+        .where((item) => !confirmation.queueIds.contains(item.id))
+        .toList(growable: false);
+  }
+
+  Future<List<SyncQueue>> _applyPending(List<SyncQueue> pending) async {
+    final applied = <SyncQueue>[];
+    for (final item in pending) {
+      final nextAttempt = item.nextAttemptAt;
+      if (nextAttempt != null && nextAttempt.isAfter(DateTime.now().toUtc())) {
+        _scheduleRetry(nextAttempt);
+        continue;
+      }
+      try {
+        if (_supportSync.handles(item)) {
+          await _supportSync.apply(item);
+        } else if (_settingsSync.handles(item)) {
+          await _settingsSync.apply(item);
+        } else {
+          await _remote.apply(item);
+        }
+        applied.add(item);
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Sync upload failed for ${item.entityType}/${item.entityId}: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+        await _recordRetry(item, error);
+        rethrow;
+      }
+    }
+    return applied;
+  }
+
+  Future<void> _confirmAppliedArrangements(List<SyncQueue> applied) async {
+    final confirmation = SongArrangementConfirmation.from(applied);
+    final orders = await _remote.fetchOwnedSongOrders(confirmation.columnIds);
+    final rejectedIds = confirmation.rejectedQueueIdsForOrders(orders);
+    final confirmedIds = applied
+        .where((item) => !rejectedIds.contains(item.id))
+        .map((item) => item.id)
+        .toSet();
+    await _deleteQueueItems(confirmedIds);
+    final rejected = await _currentPending(rejectedIds);
+    if (rejected.isEmpty) return;
+    for (final item in rejected) {
+      await _recordRetry(
+        item,
+        StateError('Server did not confirm song arrangement'),
+      );
+    }
+    throw StateError('Server did not confirm song arrangement');
+  }
+
+  Future<List<SyncQueue>> _currentPending(Set<int> ids) async {
+    final result = <SyncQueue>[];
+    for (final id in ids) {
+      final item = await _isar.syncQueues.get(id);
+      if (item != null && item.status == 'pending') result.add(item);
+    }
+    return result;
+  }
 
   Future<List<SyncQueue>> _pendingFor(String userId) async {
     final items = await _isar.syncQueues
@@ -476,129 +751,9 @@ class SyncService {
     return DateTime.parse(value as String).toUtc();
   }
 
-  Future<void> _replaceCleanCache(
-    String userId,
-    List<SongList> remoteBoards,
-  ) async {
-    final remoteIds = remoteBoards.map((board) => board.id).toSet();
-    await _isar.writeTxn(() async {
-      final localRows = await _isar.cachedBoards
-          .filter()
-          .accountIdEqualTo(userId)
-          .findAll();
-      final pending = await _isar.syncQueues
-          .filter()
-          .userIdEqualTo(userId)
-          .and()
-          .statusEqualTo('pending')
-          .findAll();
-      final dirtyBoardIds = <String>{};
-      for (final row in localRows) {
-        if (pending.any((item) => row.document.contains(item.entityId))) {
-          dirtyBoardIds.add(row.uuid);
-        }
-      }
-      for (final row in localRows) {
-        if (!dirtyBoardIds.contains(row.uuid) &&
-            !remoteIds.contains(row.uuid)) {
-          await _isar.cachedBoards.delete(row.id);
-        }
-      }
-      for (final board in remoteBoards) {
-        if (dirtyBoardIds.contains(board.id)) continue;
-        await _putBoard(userId, board);
-      }
-    });
-  }
-
-  bool _arrangementMatches(List<SongList> boards, SyncQueue item) {
-    if (item.operation != 'reorder' && item.operation != 'move') return true;
-    final payload = jsonDecode(item.payload!) as Map<String, dynamic>;
-    if (item.operation == 'reorder') {
-      return listEquals(
-        _columnSongIds(boards, payload['column_id'] as String),
-        (payload['ids'] as List).cast<String>(),
-      );
-    }
-    return listEquals(
-          _columnSongIds(boards, payload['source_column_id'] as String),
-          (payload['source_song_ids'] as List).cast<String>(),
-        ) &&
-        listEquals(
-          _columnSongIds(boards, payload['destination_column_id'] as String),
-          (payload['destination_song_ids'] as List).cast<String>(),
-        );
-  }
-
-  List<String> _columnSongIds(List<SongList> boards, String columnId) {
-    for (final board in boards) {
-      for (final column in board.columns) {
-        if (column.id == columnId) {
-          // Reorder uploads are deliberately limited to songs owned by this
-          // account. A shared column may also contain admin songs, whose
-          // positions this user cannot update. Confirm only the subset this
-          // queue item is authorized to arrange.
-          return column.songs
-              .where((song) => song.canEdit)
-              .map((song) => song.id)
-              .toList(growable: false);
-        }
-      }
-    }
-    return const [];
-  }
-
-  Future<bool> _replaceAllCache(String userId, List<SongList> boards) async {
-    final ids = boards.map((board) => board.id).toSet();
-    final existing = await _isar.cachedBoards
-        .filter()
-        .accountIdEqualTo(userId)
-        .findAll();
-    return _isar.writeTxn(() async {
-      final pendingMutation = await _isar.syncQueues
-          .filter()
-          .userIdEqualTo(userId)
-          .and()
-          .statusEqualTo('pending')
-          .findFirst();
-      if (pendingMutation != null) return false;
-
-      for (final row in existing.where((row) => !ids.contains(row.uuid))) {
-        await _isar.cachedBoards.delete(row.id);
-      }
-      for (final board in boards) {
-        await _putBoard(userId, board);
-      }
-      return true;
-    });
-  }
-
-  Future<void> _putBoard(String userId, SongList board) async {
-    final existing = await _isar.cachedBoards
-        .filter()
-        .cacheKeyEqualTo('$userId:${board.id}')
-        .findFirst();
-    final mergedBoard = existing == null
-        ? board
-        : _preserveCachedAttachmentPaths(
-            board,
-            BoardCodec.decode(existing.document),
-          );
-    final document = BoardCodec.encode(mergedBoard);
-    if (existing != null &&
-        existing.ownerId == board.ownerId &&
-        existing.document == document) {
-      return;
-    }
-    await _isar.cachedBoards.put(
-      (existing ?? CachedBoard())
-        ..uuid = board.id
-        ..cacheKey = '$userId:${board.id}'
-        ..accountId = userId
-        ..ownerId = board.ownerId
-        ..document = document
-        ..updatedAt = DateTime.now().toUtc(),
-    );
+  Future<void> _deleteQueueItems(Set<int> ids) async {
+    if (ids.isEmpty) return;
+    await _isar.writeTxn(() => _isar.syncQueues.deleteAll(ids.toList()));
   }
 
   Future<void> _recordRetry(SyncQueue item, Object error) async {
@@ -832,30 +987,6 @@ class SyncService {
       return column.copyWith(songs: songs);
     }).toList();
     return changed ? board.copyWith(columns: columns) : board;
-  }
-
-  SongList _preserveCachedAttachmentPaths(SongList remote, SongList local) {
-    final cachedPaths = <String, String>{};
-    for (final column in local.columns) {
-      for (final song in column.songs) {
-        for (final attachment in song.attachments) {
-          final path = attachment.localPath;
-          if (path != null) cachedPaths[_attachmentKey(attachment)] = path;
-        }
-      }
-    }
-    var result = remote;
-    for (final column in remote.columns) {
-      for (final song in column.songs) {
-        for (final attachment in song.attachments) {
-          final path = cachedPaths[_attachmentKey(attachment)];
-          if (path != null) {
-            result = _replaceAttachmentPath(result, attachment, path);
-          }
-        }
-      }
-    }
-    return result;
   }
 
   static bool _sameAttachment(SongAttachment first, SongAttachment second) =>

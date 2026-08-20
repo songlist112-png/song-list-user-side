@@ -7,6 +7,7 @@ import 'package:my_app/features/boards/presentation/widgets/song_card_widget.dar
 import 'package:my_app/features/settings/domain/entities/user_preferences.dart';
 import 'package:my_app/features/settings/domain/repositories/settings_repository.dart';
 import 'package:my_app/features/settings/presentation/providers/settings_provider.dart';
+import 'package:my_app/features/songs/presentation/widgets/protected_lyrics_text.dart';
 import 'package:my_app/shared/models/song.dart';
 
 class _InMemorySettingsRepository implements SettingsRepository {
@@ -163,5 +164,41 @@ void main() {
 
     final lyricText = tester.widget<Text>(find.text(lyrics));
     expect(lyricText.style?.fontSize, closeTo(13 * 1.2, 0.001));
+  });
+
+  testWidgets('displayed lyrics disable copying by default', (tester) async {
+    await tester.pumpWidget(
+      _settingsScope(
+        const MaterialApp(
+          home: Scaffold(
+            body: SongCardWidget(
+              song: Song(id: '1', title: 'Protected', lyrics: 'Private lyrics'),
+              isExpanded: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(ProtectedLyricsText), findsOneWidget);
+    expect(find.byType(SelectionArea), findsNothing);
+    expect(find.byType(SelectableText), findsNothing);
+    expect(find.byType(EditableText), findsNothing);
+
+    final lyrics = find.text('Private lyrics');
+    await tester.longPress(lyrics);
+    await tester.pumpAndSettle();
+    expect(find.text('Copy'), findsNothing);
+    expect(find.text('Cut'), findsNothing);
+    expect(find.text('Paste'), findsNothing);
+    expect(find.text('Select all'), findsNothing);
+
+    await tester.tap(lyrics);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(lyrics);
+    await tester.pumpAndSettle();
+    expect(find.text('Copy'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }

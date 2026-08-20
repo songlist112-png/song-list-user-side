@@ -36,6 +36,7 @@ void main() {
     await tester.pump();
     expect(saveButton().onPressed, isNotNull);
     final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.enableInteractiveSelection, isNot(false));
     final context = tester.element(find.byType(TextField));
     final span = field.controller!.buildTextSpan(
       context: context,

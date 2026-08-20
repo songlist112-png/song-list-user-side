@@ -30,3 +30,26 @@ or manage their subscription.
 
 VS Code's `Song List (local)` launch configuration supplies this file
 automatically. Use the same option for other run and build commands.
+
+## Offline synchronization
+
+The mobile client uses incremental offline-first synchronization:
+
+- A new account receives boards and columns first, then songs in resumable
+  500-record pages. Each page is committed with one bulk Isar transaction so
+  the authenticated setup screen can show the real server-backed song count
+  from 0–100%. The library opens after every page is available offline, and
+  interrupted progress resumes from the last committed page.
+- Existing accounts request only rows changed or deleted after their last
+  successful server watermark. Pagination uses the stable
+  `(updated_at, id)` cursor instead of offsets.
+- Sync metadata stores a cache contract version and an in-progress cursor. A
+  cache-version bump safely starts a new initial pull without deleting pending
+  local mutations.
+- Attachment metadata is synchronized with each song. File bytes are only
+  downloaded when the user opens an attachment.
+
+Deploy `supabase/migrations/20260819000000_incremental_batched_sync.sql`
+before releasing a client that uses this protocol. The migration adds the
+secure pull RPCs, cursor indexes, tombstone ownership, and relationship
+triggers required for complete incremental updates.

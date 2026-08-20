@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:my_app/database/local/models/cached_board.dart';
 import 'package:my_app/database/local/models/personal_song_edit.dart';
 import 'package:my_app/database/local/models/sync_queue.dart';
@@ -100,6 +100,33 @@ void main() {
     },
   );
 
+  test(
+    'moving a song away and back preserves both ordered transitions',
+    () async {
+      final repository = _repository(isar);
+
+      await repository.moveSong('one', 'column-two');
+      await repository.moveSong('one', 'column');
+
+      final restored = await repository.fetchBoard('board');
+      expect(restored.columns[0].songs.map((song) => song.id), [
+        'two',
+        'three',
+        'one',
+      ]);
+      expect(restored.columns[1].songs, isEmpty);
+
+      final queue = await isar.syncQueues.where().findAll();
+      expect(queue.map((item) => item.operation), ['move', 'move']);
+      final finalPayload =
+          jsonDecode(queue.last.payload!) as Map<String, dynamic>;
+      expect(finalPayload['source_column_id'], 'column-two');
+      expect(finalPayload['destination_column_id'], 'column');
+      expect(finalPayload['source_song_ids'], <String>[]);
+      expect(finalPayload['destination_song_ids'], ['two', 'three', 'one']);
+    },
+  );
+
   test('personal lyrics overlay never mutates cached admin song', () async {
     final row = (await isar.cachedBoards.where().findAll()).single;
     final board = BoardCodec.decode(row.document);
@@ -149,14 +176,14 @@ Future<void> _initializeIsarCore() async {
   final config = jsonDecode(await packageConfig.readAsString());
   final packages = config['packages'] as List<dynamic>;
   final isarFlutterLibs = packages.cast<Map<String, dynamic>>().singleWhere(
-    (package) => package['name'] == 'isar_flutter_libs',
+    (package) => package['name'] == 'isar_community_flutter_libs',
   );
   final rootUri = isarFlutterLibs['rootUri'] as String;
   final packageRoot = packageConfig.uri.resolve(
     rootUri.endsWith('/') ? rootUri : '$rootUri/',
   );
   final relativeLibraryPath = switch (Abi.current()) {
-    Abi.windowsX64 || Abi.windowsArm64 => 'windows/isar.dll',
+    Abi.windowsX64 || Abi.windowsArm64 => 'windows/libisar.dll',
     Abi.linuxX64 => 'linux/libisar.so',
     Abi.macosX64 || Abi.macosArm64 => 'macos/libisar.dylib',
     final abi => throw UnsupportedError('Unsupported Isar test ABI: $abi'),
