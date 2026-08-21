@@ -17,6 +17,7 @@ class AddEditSongPage extends StatefulWidget {
   final List<Label> availableLabels;
   final Future<void> Function(Song) onSave;
   final Future<void> Function()? onDelete;
+  final Future<String?> Function()? onAddArtist;
   final Future<Uint8List> Function(SongAttachment)? onDownloadAttachment;
 
   const AddEditSongPage({
@@ -26,6 +27,7 @@ class AddEditSongPage extends StatefulWidget {
     this.availableLabels = const [],
     required this.onSave,
     this.onDelete,
+    this.onAddArtist,
     this.onDownloadAttachment,
   });
 
@@ -40,10 +42,12 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
   late final TextEditingController _tempoController;
   late final TextEditingController _lyricsController;
   String? _selectedArtist;
+  late final List<String> _availableArtists;
   String? _selectedKey;
   String _selectedKeyType = 'Major';
   List<SongAttachment> _attachments = [];
   List<String> _selectedLabelIds = [];
+  bool _isAddingArtist = false;
   static const List<String> _keys = [
     '(none)',
     "C",
@@ -79,6 +83,11 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       text: widget.existingSong?.lyrics ?? '',
     );
     _selectedArtist = widget.existingSong?.artistName;
+    _availableArtists = [...widget.availableArtists];
+    if (_selectedArtist case final artist?
+        when !_availableArtists.contains(artist)) {
+      _availableArtists.add(artist);
+    }
     _selectedKey = widget.existingSong?.key;
     _selectedKeyType = widget.existingSong?.keyType ?? 'Major';
     _attachments = List<SongAttachment>.from(
@@ -138,10 +147,30 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     }
   }
 
-  void _showError(Object error) {
+  Future<void> _handleAddArtist() async {
+    final addArtist = widget.onAddArtist;
+    if (addArtist == null || _isAddingArtist) return;
+    setState(() => _isAddingArtist = true);
+    try {
+      final artist = await addArtist();
+      if (!mounted || artist == null) return;
+      setState(() {
+        if (!_availableArtists.contains(artist)) {
+          _availableArtists.add(artist);
+        }
+        _selectedArtist = artist;
+      });
+    } on Exception catch (error) {
+      if (mounted) _showError(error, action: 'create artist');
+    } finally {
+      if (mounted) setState(() => _isAddingArtist = false);
+    }
+  }
+
+  void _showError(Object error, {String action = 'save song'}) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Could not save song: $error')));
+    ).showSnackBar(SnackBar(content: Text('Could not $action: $error')));
   }
 
   @override
@@ -226,6 +255,7 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
+                          key: ValueKey(_selectedArtist),
                           initialValue: _selectedArtist,
                           decoration: const InputDecoration(
                             contentPadding: EdgeInsets.symmetric(
@@ -236,7 +266,7 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             hintText: 'Select artist',
                           ),
                           dropdownColor: _colors.surface,
-                          items: widget.availableArtists.map((a) {
+                          items: _availableArtists.map((a) {
                             return DropdownMenuItem(
                               value: a,
                               child: Text(
@@ -254,27 +284,33 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                         ),
                       ),
                     ),
-                    // const SizedBox(width: 10),
-                    // Container(
-                    //   height: 48,
-                    //   width: 48,
-                    //   decoration: BoxDecoration(
-                    //     color: AppColors.accent.withValues(alpha: 0.1),
-                    //     borderRadius: BorderRadius.circular(12),
-                    //     border: Border.all(
-                    //       color: AppColors.accent.withValues(alpha: 0.3),
-                    //     ),
-                    //   ),
-                    //   child: IconButton(
-                    //     onPressed: _showAddArtistDialog,
-                    //     icon: const Icon(
-                    //       Icons.add,
-                    //       size: 20,
-                    //       color: AppColors.accent,
-                    //     ),
-                    //     tooltip: 'Add new artist',
-                    //   ),
-                    // ),
+                    if (widget.onAddArtist != null) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        height: 48,
+                        width: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: IconButton(
+                          onPressed: _isAddingArtist ? null : _handleAddArtist,
+                          icon: _isAddingArtist
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.add, size: 20),
+                          color: AppColors.accent,
+                          tooltip: 'Add new artist',
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -785,39 +821,6 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       ],
     );
   }
-
-  // void _showAddArtistDialog() {
-  //   final controller = TextEditingController();
-  //   showDialog(
-  //     context: context,
-  //     builder: (ctx) => AlertDialog(
-  //       title: const Text('Add Artist'),
-  //       content: TextField(
-  //         controller: controller,
-  //         autofocus: true,
-  //         decoration: const InputDecoration(hintText: 'Artist name'),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(ctx),
-  //           child: const Text('Cancel'),
-  //         ),
-  //         ElevatedButton(
-  //           onPressed: () {
-  //             final name = controller.text.trim();
-  //             if (name.isNotEmpty) {
-  //               setState(() {
-  //                 _selectedArtist = name;
-  //               });
-  //             }
-  //             Navigator.pop(ctx);
-  //           },
-  //           child: const Text('Add'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   Future<void> _pickFile() async {
     try {

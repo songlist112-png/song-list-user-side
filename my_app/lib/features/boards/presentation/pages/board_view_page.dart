@@ -318,6 +318,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         AddEditSongPage(
           availableArtists: _songList.artists.map((a) => a.name).toList(),
           availableLabels: _songList.labels,
+          onAddArtist: _addArtistFromSongEditor,
           onDownloadAttachment: _repository.downloadAttachment,
           onSave: (song) async {
             final column = _songList.columns.firstWhere(
@@ -367,6 +368,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           existingSong: song,
           availableArtists: allArtistNames,
           availableLabels: _songList.labels,
+          onAddArtist: _addArtistFromSongEditor,
           onDownloadAttachment: _repository.downloadAttachment,
           onSave: (updatedSong) async {
             final savedSong = await _repository.updateSong(updatedSong);
@@ -653,23 +655,42 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     if (name == null || name == existing?.name) return;
 
     try {
-      final saved = existing == null
-          ? await _repository.createArtist(name)
-          : await _repository.updateArtist(existing.copyWith(name: name));
+      await _saveArtist(name, existing);
       if (!mounted) return;
-      final artists = existing == null
-          ? [..._songList.artists, saved]
-          : _songList.artists
-                .map((artist) => artist.id == saved.id ? saved : artist)
-                .toList();
-      setState(() => _songList = _songList.copyWith(artists: artists));
-      if (existing == null) {
-        AppSnackbar.showSuccess(context, 'Artist created');
-      }
       _showMenu();
     } on Exception catch (error) {
       if (mounted) _showError(error);
     }
+  }
+
+  Future<String?> _addArtistFromSongEditor() async {
+    final name = await showNamePrompt(
+      context,
+      title: 'Add Artist',
+      label: 'Artist name',
+      actionLabel: 'Add',
+      theme: _boardTheme,
+    );
+    if (name == null) return null;
+    for (final artist in _songList.artists) {
+      if (artist.name.toLowerCase() == name.toLowerCase()) return artist.name;
+    }
+    return (await _saveArtist(name)).name;
+  }
+
+  Future<Artist> _saveArtist(String name, [Artist? existing]) async {
+    final saved = existing == null
+        ? await _repository.createArtist(name)
+        : await _repository.updateArtist(existing.copyWith(name: name));
+    if (!mounted) return saved;
+    final artists = existing == null
+        ? [..._songList.artists, saved]
+        : _songList.artists
+              .map((artist) => artist.id == saved.id ? saved : artist)
+              .toList();
+    setState(() => _songList = _songList.copyWith(artists: artists));
+    if (existing == null) AppSnackbar.showSuccess(context, 'Artist created');
+    return saved;
   }
 
   Future<void> _removeArtist(String id) async {

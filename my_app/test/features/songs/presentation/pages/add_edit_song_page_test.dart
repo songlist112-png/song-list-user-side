@@ -35,4 +35,30 @@ void main() {
     expect(find.byTooltip('Download file'), findsOneWidget);
     expect(find.byTooltip('Remove'), findsOneWidget);
   });
+
+  testWidgets('plus button adds and selects artist', (tester) async {
+    Song? savedSong;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AddEditSongPage(
+          availableArtists: const ['Existing Artist'],
+          onAddArtist: () async => 'New Artist',
+          onSave: (song) async => savedSong = song,
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Enter song title'),
+      'Song',
+    );
+    await tester.tap(find.byTooltip('Add new artist'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New Artist'), findsOneWidget);
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(savedSong?.artistName, 'New Artist');
+  });
 }

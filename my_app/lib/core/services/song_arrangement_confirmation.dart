@@ -9,6 +9,9 @@ import '../../shared/models/song_list.dart';
 /// column. This prevents a valid move-back sequence from being compared with
 /// an intermediate server arrangement.
 class SongArrangementConfirmation {
+  static const retiredConfirmationError =
+      'Server did not confirm song arrangement';
+
   SongArrangementConfirmation._({
     required this.queueIds,
     required this._expectations,
@@ -51,6 +54,11 @@ class SongArrangementConfirmation {
 
   final Set<int> queueIds;
   final Map<String, _ColumnExpectation> _expectations;
+
+  static bool shouldRecover(SyncQueue item) =>
+      item.status == 'failed' &&
+      _isArrangement(item) &&
+      (item.lastError?.contains(retiredConfirmationError) ?? false);
 
   bool get isEmpty => _expectations.isEmpty;
   Set<String> get columnIds => _expectations.keys.toSet();

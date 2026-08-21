@@ -10,34 +10,33 @@ class _MockSupabaseClient extends Mock implements SupabaseClient {}
 
 void main() {
   test(
-    'successful reorder RPC is left to canonical sync confirmation',
+    'successful reorder RPC is authoritative for repeated alternating orders',
     () async {
       final client = _MockSupabaseClient();
-      String? receivedColumnId;
-      List<String>? receivedIds;
+      final receivedOrders = <List<String>>[];
       final dataSource = SyncRemoteDataSource(
         client: client,
         reorderSongsRpc: ({required columnId, required ids}) async {
-          receivedColumnId = columnId;
-          receivedIds = ids;
+          expect(columnId, 'column-id');
+          receivedOrders.add(List<String>.of(ids));
         },
       );
-      final item = SyncQueue()
-        ..entityType = 'songs'
-        ..entityId = 'column-id'
-        ..operation = 'reorder'
-        ..payload = jsonEncode({
-          'column_id': 'column-id',
-          'ids': ['song-1', 'song-2'],
-        })
-        ..status = 'pending'
-        ..createdAt = DateTime.utc(2026)
-        ..userId = 'user-id';
+      for (var cycle = 0; cycle < 5; cycle++) {
+        await dataSource.apply(_reorder(['song-2', 'song-1']));
+        await dataSource.apply(_reorder(['song-1', 'song-2']));
+      }
 
-      await expectLater(dataSource.apply(item), completes);
-
-      expect(receivedColumnId, 'column-id');
-      expect(receivedIds, ['song-1', 'song-2']);
+      expect(receivedOrders, hasLength(10));
+      expect(receivedOrders.last, ['song-1', 'song-2']);
     },
   );
 }
+
+SyncQueue _reorder(List<String> ids) => SyncQueue()
+  ..entityType = 'songs'
+  ..entityId = 'column-id'
+  ..operation = 'reorder'
+  ..payload = jsonEncode({'column_id': 'column-id', 'ids': ids})
+  ..status = 'pending'
+  ..createdAt = DateTime.utc(2026)
+  ..userId = 'user-id';
