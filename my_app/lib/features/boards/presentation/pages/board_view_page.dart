@@ -11,10 +11,10 @@ import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_column.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../songs/data/isar_personal_song_edit_repository.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../../songs/presentation/pages/personal_song_edit_page.dart';
-import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../application/board_detail_controller.dart';
 import '../../data/board_repository.dart';
 import '../../domain/board_filter.dart';
@@ -22,6 +22,7 @@ import '../../domain/song_reorder.dart';
 import '../providers/search_history_provider.dart';
 import '../widgets/add_column_button.dart';
 import '../widgets/key_filter_bar.dart';
+import '../widgets/magnetic_column_pager.dart';
 import '../widgets/menu_bottom_sheet.dart';
 import '../widgets/name_prompt_dialog.dart';
 import '../widgets/song_column_widget.dart';
@@ -49,6 +50,43 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   Widget _applyBoardTheme(Widget child) {
     return Theme(data: _boardTheme, child: child);
+  }
+
+  Widget _buildColumnPage(
+    SongColumn column, {
+    required bool canMutate,
+    required bool canReorder,
+  }) {
+    final filteredColumn = column.copyWith(
+      songs: BoardFilter.songs(
+        column.songs,
+        key: _activeKey,
+        accidental: _activeAccidental,
+      ),
+    );
+    return SongColumnWidget(
+      width: double.infinity,
+      column: filteredColumn,
+      showArtist: _songList.showArtist,
+      showBpm: _songList.showBpm,
+      isViewMode: !canMutate,
+      availableLabels: _songList.labels,
+      onAddSong: () => _addSongToColumn(filteredColumn.id),
+      onMenuTap: () => _showColumnMenu(filteredColumn),
+      onSongTap: !canMutate
+          ? null
+          : (song) {
+              if (song.canEdit) _editSong(song, column.id);
+            },
+      onMoveSong: !canMutate
+          ? null
+          : (song) => unawaited(_showMoveSongSheet(song, column.id)),
+      onPersonalEdit: _editPersonalSong,
+      onReorderSongs: !canReorder
+          ? null
+          : (oldIndex, newIndex) =>
+                unawaited(_reorderSongs(column.id, oldIndex, newIndex)),
+    );
   }
 
   // Key filter state
@@ -1225,61 +1263,18 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                               ),
                             )
                     // Board has columns
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ...filteredColumns.map((column) {
-                              final filteredSongs = BoardFilter.songs(
-                                column.songs,
-                                key: _activeKey,
-                                accidental: _activeAccidental,
-                              );
-                              final filteredColumn = column.copyWith(
-                                songs: filteredSongs,
-                              );
-
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: SongColumnWidget(
-                                  column: filteredColumn,
-                                  showArtist: _songList.showArtist,
-                                  showBpm: _songList.showBpm,
-                                  isViewMode: !canMutate,
-                                  availableLabels: _songList.labels,
-                                  onAddSong: () =>
-                                      _addSongToColumn(filteredColumn.id),
-                                  onMenuTap: () =>
-                                      _showColumnMenu(filteredColumn),
-                                  onSongTap: !canMutate
-                                      ? null
-                                      : (song) {
-                                          if (song.canEdit) {
-                                            _editSong(song, column.id);
-                                          }
-                                        },
-                                  onMoveSong: !canMutate
-                                      ? null
-                                      : (song) => unawaited(
-                                          _showMoveSongSheet(song, column.id),
-                                        ),
-                                  onPersonalEdit: _editPersonalSong,
-                                  onReorderSongs: !canReorder
-                                      ? null
-                                      : (oldIndex, newIndex) => unawaited(
-                                          _reorderSongs(
-                                            column.id,
-                                            oldIndex,
-                                            newIndex,
-                                          ),
-                                        ),
-                                ),
-                              );
-                            }),
-                            if (canMutate) AddColumnButton(onTap: _addColumn),
-                          ],
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 16),
+                        child: MagneticColumnPager(
+                          itemCount: filteredColumns.length,
+                          itemBuilder: (_, index) => _buildColumnPage(
+                            filteredColumns[index],
+                            canMutate: canMutate,
+                            canReorder: canReorder,
+                          ),
+                          trailing: canMutate
+                              ? AddColumnButton(onTap: _addColumn)
+                              : null,
                         ),
                       ),
               ),

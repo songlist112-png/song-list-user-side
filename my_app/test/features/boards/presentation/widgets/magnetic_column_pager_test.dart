@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:my_app/features/boards/presentation/widgets/magnetic_column_pager.dart';
+
+void main() {
+  testWidgets('snaps selected column to center with neighbor edges visible', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 500,
+            child: MagneticColumnPager(
+              itemCount: 5,
+              itemBuilder: (_, index) => Container(
+                key: ValueKey('column-$index'),
+                width: double.infinity,
+                height: 300,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.drag(find.byType(PageView), const Offset(-360, 0));
+    await tester.pumpAndSettle();
+
+    final selected = tester.getRect(find.byKey(const ValueKey('column-1')));
+    final leftNeighbor = tester.getRect(find.byKey(const ValueKey('column-0')));
+    final rightNeighbor = tester.getRect(
+      find.byKey(const ValueKey('column-2')),
+    );
+
+    expect(selected.center.dx, closeTo(200, 0.1));
+    expect(leftNeighbor.right, greaterThan(0));
+    expect(rightNeighbor.left, lessThan(400));
+  });
+}

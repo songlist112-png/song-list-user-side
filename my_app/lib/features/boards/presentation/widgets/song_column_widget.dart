@@ -18,6 +18,7 @@ class SongColumnWidget extends StatefulWidget {
   final Function(String)? onRenameColumn;
   final Function(int, int)? onReorderSongs;
   final List<Label> availableLabels;
+  final double? width;
 
   const SongColumnWidget({
     super.key,
@@ -33,6 +34,7 @@ class SongColumnWidget extends StatefulWidget {
     this.onRenameColumn,
     this.onReorderSongs,
     this.availableLabels = const [],
+    this.width,
   });
 
   @override
@@ -57,7 +59,7 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
     final colors = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     // Use almost full screen width with small padding (16px on each side)
-    final columnWidth = screenWidth - 32;
+    final columnWidth = widget.width ?? screenWidth - 32;
     final canReorder =
         widget.onReorderSongs != null &&
         widget.column.songs.every((song) => song.canEdit);
