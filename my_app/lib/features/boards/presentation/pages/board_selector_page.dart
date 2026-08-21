@@ -193,6 +193,7 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final profile = ref.watch(currentProfileProvider).asData?.value;
     final syncStatus = ref
         .watch(syncStatusProvider)
@@ -215,9 +216,11 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
             _WelcomeHeader(onSignOut: _signOut),
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF4F4F4),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(40),
+                  ),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Column(
@@ -359,6 +362,7 @@ class _InitialSyncState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Semantics(
       container: true,
       liveRegion: true,
@@ -375,7 +379,7 @@ class _InitialSyncState extends StatelessWidget {
                 _title,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.text,
+                  color: colors.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -383,7 +387,7 @@ class _InitialSyncState extends StatelessWidget {
               Text(
                 _message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+                style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
               ),
               if (_canRetry) ...[
                 const SizedBox(height: 20),
@@ -408,19 +412,12 @@ class _SyncStatusGraphic extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mutedColor = Theme.of(context).colorScheme.onSurfaceVariant;
     if (status.phase == SyncPhase.offline) {
-      return const Icon(
-        Icons.cloud_off_outlined,
-        size: 52,
-        color: AppColors.textMuted,
-      );
+      return Icon(Icons.cloud_off_outlined, size: 52, color: mutedColor);
     }
     if (status.phase == SyncPhase.failed) {
-      return const Icon(
-        Icons.sync_problem_outlined,
-        size: 52,
-        color: AppColors.textMuted,
-      );
+      return Icon(Icons.sync_problem_outlined, size: 52, color: mutedColor);
     }
     return const CircularProgressIndicator(
       semanticsLabel: 'Loading account data',
@@ -490,42 +487,45 @@ class _BoardTabs extends StatelessWidget {
   final TabController controller;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 80,
-    child: TabBar(
-      controller: controller,
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      indicatorColor: AppColors.accent,
-      indicatorSize: TabBarIndicatorSize.label,
-      indicatorWeight: 3,
-      dividerColor: Colors.transparent,
-      labelColor: Colors.black,
-      unselectedLabelColor: Colors.black,
-      labelStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
-      tabs: const [
-        Tab(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.library_music_rounded, color: AppColors.accent),
-              SizedBox(width: 8),
-              Text('Boards'),
-            ],
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 80,
+      child: TabBar(
+        controller: controller,
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        indicatorColor: AppColors.accent,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicatorWeight: 3,
+        dividerColor: Colors.transparent,
+        labelColor: colors.onSurface,
+        unselectedLabelColor: colors.onSurfaceVariant,
+        labelStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+        tabs: const [
+          Tab(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.library_music_rounded, color: AppColors.accent),
+                SizedBox(width: 8),
+                Text('Play Lists'),
+              ],
+            ),
           ),
-        ),
-        Tab(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.queue_music_rounded, color: AppColors.accent),
-              SizedBox(width: 8),
-              Text('My Boards'),
-            ],
+          Tab(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.queue_music_rounded, color: AppColors.accent),
+                SizedBox(width: 8),
+                Text('My Song Lists'),
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _BoardList extends StatelessWidget {
@@ -580,18 +580,19 @@ class _BoardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final listCount = board.columns.length;
     final songCount = board.columns.fold<int>(
       0,
       (total, column) => total + column.songs.length,
     );
     return Material(
-      color: AppColors.bgCard,
+      color: colors.surface,
       elevation: 1.5,
-      shadowColor: AppColors.text.withValues(alpha: 0.16),
+      shadowColor: colors.onSurface.withValues(alpha: 0.16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+        side: BorderSide(color: colors.outline.withValues(alpha: 0.6)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -612,10 +613,10 @@ class _BoardTile extends StatelessWidget {
                       board.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text,
+                        color: colors.onSurface,
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -640,13 +641,13 @@ class _BoardTile extends StatelessWidget {
               Container(
                 width: 32,
                 height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEFF1F4),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_right_rounded,
-                  color: AppColors.textMuted,
+                  color: colors.onSurfaceVariant,
                   size: 22,
                 ),
               ),
@@ -691,17 +692,18 @@ class _BoardStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: AppColors.textMuted),
+        Icon(icon, size: 14, color: colors.onSurfaceVariant),
         const SizedBox(width: 4),
         Text(
           '$count',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.textMuted,
+            color: colors.onSurfaceVariant,
           ),
         ),
       ],
@@ -738,6 +740,7 @@ class _ProfileMenu extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
     final profile = ref.watch(currentProfileProvider).asData?.value;
     final fullName = profile?.fullName?.trim();
     final email = profile?.email ?? '';
@@ -778,41 +781,48 @@ class _ProfileMenu extends ConsumerWidget {
       },
       offset: const Offset(0, 60),
       elevation: 12,
-      color: Colors.white,
+      color: colors.surface,
       surfaceTintColor: Colors.transparent,
-      shadowColor: AppColors.text.withValues(alpha: 0.25),
+      shadowColor: colors.onSurface.withValues(alpha: 0.25),
       padding: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+        side: BorderSide(color: colors.outline.withValues(alpha: 0.8)),
       ),
-      icon: _buildAvatar(displayName, avatarImage),
+      icon: _buildAvatar(displayName, avatarImage, colors),
       itemBuilder: (_) => [
-        _buildHeader(displayName, email, avatarImage),
+        _buildHeader(displayName, email, avatarImage, colors),
         const PopupMenuDivider(height: 10),
         _buildItem(
           value: 'subscription',
           icon: Icons.workspace_premium_outlined,
           color: AppColors.accent,
           label: 'Subscription',
+          colors: colors,
         ),
         _buildItem(
           value: 'support',
           icon: Icons.help_outline_rounded,
-          color: AppColors.textMuted,
+          color: colors.onSurfaceVariant,
           label: 'Help & Feedback',
+          colors: colors,
         ),
         _buildItem(
           value: 'logout',
           icon: Icons.logout_rounded,
           color: const Color(0xFFD32F2F),
           label: 'Log Out',
+          colors: colors,
         ),
       ],
     );
   }
 
-  Widget _buildAvatar(String displayName, ImageProvider<Object>? image) {
+  Widget _buildAvatar(
+    String displayName,
+    ImageProvider<Object>? image,
+    ColorScheme colors,
+  ) {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
@@ -830,7 +840,7 @@ class _ProfileMenu extends ConsumerWidget {
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: const Color(0xFFEFF3FA),
+            backgroundColor: colors.surfaceContainerHighest,
             backgroundImage: image,
             child: image == null
                 ? Text(
@@ -851,6 +861,7 @@ class _ProfileMenu extends ConsumerWidget {
     String name,
     String email,
     ImageProvider<Object>? image,
+    ColorScheme colors,
   ) {
     return PopupMenuItem<String>(
       enabled: false,
@@ -858,14 +869,14 @@ class _ProfileMenu extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F4F9),
+          color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: Colors.white,
+              backgroundColor: colors.surface,
               backgroundImage: image,
               child: image == null
                   ? Text(
@@ -887,10 +898,10 @@ class _ProfileMenu extends ConsumerWidget {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.text,
+                      color: colors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -898,9 +909,9 @@ class _ProfileMenu extends ConsumerWidget {
                     email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
-                      color: AppColors.textMuted,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -917,6 +928,7 @@ class _ProfileMenu extends ConsumerWidget {
     required IconData icon,
     required Color color,
     required String label,
+    required ColorScheme colors,
   }) {
     return PopupMenuItem<String>(
       value: value,
@@ -935,10 +947,10 @@ class _ProfileMenu extends ConsumerWidget {
           const SizedBox(width: 12),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: AppColors.text,
+              color: colors.onSurface,
             ),
           ),
         ],
@@ -953,22 +965,29 @@ class _EmptyBoards extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: const EdgeInsets.symmetric(horizontal: 24),
-    children: [
-      const SizedBox(height: 150),
-      const Icon(Icons.library_music_outlined, size: 58, color: Colors.black26),
-      const SizedBox(height: 14),
-      Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.black45, fontSize: 16),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      children: [
+        const SizedBox(height: 150),
+        Icon(
+          Icons.library_music_outlined,
+          size: 58,
+          color: colors.onSurfaceVariant.withValues(alpha: 0.6),
         ),
-      ),
-    ],
-  );
+        const SizedBox(height: 14),
+        Center(
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _LoadError extends StatelessWidget {

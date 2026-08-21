@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/app_colors.dart';
-
 class AppChip extends StatelessWidget {
   final String label;
   final Color? backgroundColor;
@@ -22,12 +20,13 @@ class AppChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: backgroundColor ?? AppColors.bgColumn,
+          color: backgroundColor ?? colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(
@@ -37,7 +36,7 @@ class AppChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: fontSize,
-                color: textColor ?? AppColors.textMuted,
+                color: textColor ?? colors.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -49,7 +48,7 @@ class AppChip extends StatelessWidget {
                 child: Icon(
                   Icons.close,
                   size: 12,
-                  color: textColor ?? AppColors.textMuted,
+                  color: textColor ?? colors.onSurfaceVariant,
                 ),
               ),
             ],

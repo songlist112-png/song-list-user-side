@@ -17,6 +17,10 @@ class PersonalLyricsEditingController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
+    final colors = Theme.of(context).colorScheme;
+    final originalTextColor = colors.brightness == Brightness.dark
+        ? colors.onSurface
+        : Colors.black;
     final composingRange = value.composing;
     if (withComposing &&
         composingRange.isValid &&
@@ -41,7 +45,7 @@ class PersonalLyricsEditingController extends TextEditingController {
               style: TextStyle(
                 color: entry.$2.isPersonal
                     ? AppColors.personalEdit
-                    : Colors.black,
+                    : originalTextColor,
               ),
             );
           })

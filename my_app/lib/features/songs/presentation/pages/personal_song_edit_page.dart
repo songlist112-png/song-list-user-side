@@ -66,8 +66,12 @@ class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final editorTextColor = colors.brightness == Brightness.dark
+        ? colors.onSurface
+        : Colors.black;
     return Scaffold(
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: colors.surface,
       appBar: AppBar(
         title: const Text('Personal lyrics & notes'),
         leading: IconButton(
@@ -107,7 +111,7 @@ class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
           const SizedBox(height: 4),
           Text(
             'Song details stay managed by admin. Only your private lyrics and notes change.',
-            style: const TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
           TextField(
@@ -116,7 +120,7 @@ class _PersonalSongEditPageState extends State<PersonalSongEditPage> {
             minLines: 14,
             maxLines: null,
             maxLength: 100000,
-            style: const TextStyle(color: Colors.black),
+            style: TextStyle(color: editorTextColor),
             decoration: InputDecoration(
               labelText: 'Your lyrics & notes',
               helperText: 'Add notes directly between lyric lines.',

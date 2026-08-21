@@ -9,6 +9,7 @@ import 'package:my_app/database/local/models/sync_queue.dart';
 import 'package:my_app/features/settings/data/datasources/local_settings_datasource.dart';
 import 'package:my_app/features/settings/data/datasources/remote_settings_datasource.dart';
 import 'package:my_app/features/settings/data/repositories/settings_repository_impl.dart';
+import 'package:my_app/features/settings/data/models/user_preferences_model.dart';
 import 'package:my_app/features/settings/domain/entities/user_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,11 +38,8 @@ Future<void> _initializeIsarCore() async {
   await Isar.initializeIsarCore(libraries: {Abi.current(): library.path});
 }
 
-Future<Isar> _openIsar(String directory, String name) => Isar.open(
-  [SyncQueueSchema],
-  directory: directory,
-  name: name,
-);
+Future<Isar> _openIsar(String directory, String name) =>
+    Isar.open([SyncQueueSchema], directory: directory, name: name);
 
 SettingsRepositoryImpl _repository(
   Isar isar, {
@@ -80,35 +78,43 @@ void main() {
     if (await directory.exists()) await directory.delete(recursive: true);
   });
 
-  test('save persists locally, enqueues one upsert, and skips the remote',
-      () async {
-    final preferences = await SharedPreferences.getInstance();
-    final local = LocalSettingsDataSource(preferences: preferences);
-    final remote = MockRemoteSettingsDataSource();
-    var syncRequests = 0;
-    final repository = _repository(
-      isar,
-      local: local,
-      remote: remote,
-      onSyncNeeded: () => syncRequests++,
-    );
+  test(
+    'save persists locally, enqueues one upsert, and skips the remote',
+    () async {
+      final preferences = await SharedPreferences.getInstance();
+      final local = LocalSettingsDataSource(preferences: preferences);
+      final remote = MockRemoteSettingsDataSource();
+      var syncRequests = 0;
+      final repository = _repository(
+        isar,
+        local: local,
+        remote: remote,
+        onSyncNeeded: () => syncRequests++,
+      );
 
-    await repository.save(const UserPreferences(lyricsFontScale: 1.25));
+      await repository.save(
+        const UserPreferences(lyricsFontScale: 1.25, darkMode: true),
+      );
 
-    final loaded = await repository.load();
-    expect(loaded, const UserPreferences(lyricsFontScale: 1.25));
-    verifyNever(() => remote.fetch(userId: any(named: 'userId')));
+      final loaded = await repository.load();
+      expect(
+        loaded,
+        const UserPreferences(lyricsFontScale: 1.25, darkMode: true),
+      );
+      verifyNever(() => remote.fetch(userId: any(named: 'userId')));
 
-    final queue = await isar.syncQueues.where().findAll();
-    expect(queue, hasLength(1));
-    final item = queue.single;
-    expect(item.entityType, 'user_preferences');
-    expect(item.operation, 'upsert');
-    expect(item.status, 'pending');
-    expect(item.userId, 'user');
-    expect(jsonDecode(item.payload!)['lyrics_font_scale'], 1.25);
-    expect(syncRequests, 1);
-  });
+      final queue = await isar.syncQueues.where().findAll();
+      expect(queue, hasLength(1));
+      final item = queue.single;
+      expect(item.entityType, 'user_preferences');
+      expect(item.operation, 'upsert');
+      expect(item.status, 'pending');
+      expect(item.userId, 'user');
+      expect(jsonDecode(item.payload!)['lyrics_font_scale'], 1.25);
+      expect(jsonDecode(item.payload!)['dark_mode'], isTrue);
+      expect(syncRequests, 1);
+    },
+  );
 
   test('rapid saves coalesce into a single queue item', () async {
     final preferences = await SharedPreferences.getInstance();
@@ -124,21 +130,67 @@ void main() {
     expect(jsonDecode(queue.single.payload!)['lyrics_font_scale'], 1.3);
   });
 
-  test('load falls back to defaults when offline and nothing is cached',
-      () async {
+  test(
+    'load falls back to defaults when offline and nothing is cached',
+    () async {
+      final preferences = await SharedPreferences.getInstance();
+      final local = LocalSettingsDataSource(preferences: preferences);
+      final remote = MockRemoteSettingsDataSource();
+      when(
+        () => remote.fetch(userId: any(named: 'userId')),
+      ).thenThrow(Exception('offline'));
+      final repository = _repository(isar, local: local, remote: remote);
+
+      final loaded = await repository.load();
+
+      expect(loaded, const UserPreferences());
+      final cached = await local.read();
+      expect(cached, isNotNull);
+      expect(cached!.lyricsFontScale, UserPreferences.defaultLyricsFontScale);
+      expect(cached.darkMode, isFalse);
+    },
+  );
+
+  test('authenticated refresh replaces cached settings from remote', () async {
     final preferences = await SharedPreferences.getInstance();
     final local = LocalSettingsDataSource(preferences: preferences);
+    await local.write(
+      const UserPreferencesModel(lyricsFontScale: 1, darkMode: false),
+    );
     final remote = MockRemoteSettingsDataSource();
-    when(() => remote.fetch(userId: any(named: 'userId'))).thenThrow(
-      Exception('offline'),
+    when(() => remote.fetch(userId: any(named: 'userId'))).thenAnswer(
+      (_) async =>
+          const UserPreferencesModel(lyricsFontScale: 1.2, darkMode: true),
     );
     final repository = _repository(isar, local: local, remote: remote);
 
-    final loaded = await repository.load();
+    final loaded = await repository.load(preferRemote: true);
 
-    expect(loaded, const UserPreferences());
-    final cached = await local.read();
-    expect(cached, isNotNull);
-    expect(cached!.lyricsFontScale, UserPreferences.defaultLyricsFontScale);
+    expect(loaded, const UserPreferences(lyricsFontScale: 1.2, darkMode: true));
+    expect((await local.read())?.darkMode, isTrue);
   });
+
+  test(
+    'authenticated refresh preserves cache when remote is offline',
+    () async {
+      final preferences = await SharedPreferences.getInstance();
+      final local = LocalSettingsDataSource(preferences: preferences);
+      await local.write(
+        const UserPreferencesModel(lyricsFontScale: 1.2, darkMode: true),
+      );
+      final remote = MockRemoteSettingsDataSource();
+      when(
+        () => remote.fetch(userId: any(named: 'userId')),
+      ).thenThrow(Exception('offline'));
+      final repository = _repository(isar, local: local, remote: remote);
+
+      final loaded = await repository.load(preferRemote: true);
+
+      expect(
+        loaded,
+        const UserPreferences(lyricsFontScale: 1.2, darkMode: true),
+      );
+      expect((await local.read())?.darkMode, isTrue);
+    },
+  );
 }

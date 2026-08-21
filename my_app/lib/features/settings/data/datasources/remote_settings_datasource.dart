@@ -24,7 +24,7 @@ class RemoteSettingsDataSource {
   Future<UserPreferencesModel?> fetch({String? userId}) async {
     final row = await _client
         .from(_table)
-        .select('lyrics_font_scale, updated_at')
+        .select('lyrics_font_scale, dark_mode, updated_at')
         .eq('user_id', userId ?? _currentUserId())
         .maybeSingle();
     if (row == null) return null;
@@ -38,13 +38,11 @@ class RemoteSettingsDataSource {
     final payload = item.payload == null
         ? <String, dynamic>{}
         : (jsonDecode(item.payload!) as Map).cast<String, dynamic>();
-    await _client.from(_table).upsert(
-      {
-        'user_id': item.userId,
-        'lyrics_font_scale': payload['lyrics_font_scale'],
-        'updated_at': payload['updated_at'],
-      },
-      onConflict: 'user_id',
-    );
+    await _client.from(_table).upsert({
+      'user_id': item.userId,
+      'lyrics_font_scale': payload['lyrics_font_scale'],
+      'dark_mode': payload['dark_mode'] as bool? ?? false,
+      'updated_at': payload['updated_at'],
+    }, onConflict: 'user_id');
   }
 }

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../app/theme/app_colors.dart';
 import '../../../../core/constants/env.dart';
 
 enum SubscriptionProblem { expired, internetRequired, serviceUnavailable }
@@ -48,6 +47,7 @@ class _SubscriptionModalState extends State<SubscriptionModal> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final content = _ModalContent.forProblem(widget.problem);
 
     return Material(
@@ -57,7 +57,7 @@ class _SubscriptionModalState extends State<SubscriptionModal> {
         margin: const EdgeInsets.all(24),
         padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(28),
           boxShadow: const [
             BoxShadow(
@@ -80,8 +80,8 @@ class _SubscriptionModalState extends State<SubscriptionModal> {
             Text(
               content.title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.text,
+              style: TextStyle(
+                color: colors.onSurface,
                 fontSize: 26,
                 height: 1.1,
                 fontWeight: FontWeight.w800,
@@ -92,8 +92,8 @@ class _SubscriptionModalState extends State<SubscriptionModal> {
             Text(
               content.message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
                 fontSize: 15,
                 height: 1.5,
               ),

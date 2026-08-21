@@ -23,6 +23,7 @@ class TextZoomControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final canZoomOut = scale > minScale;
     final canZoomIn = scale < maxScale;
     return Semantics(
@@ -30,27 +31,42 @@ class TextZoomControl extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F4F9),
+          color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _zoomButton(Icons.text_decrease, canZoomOut, onZoomOut),
+            _zoomButton(
+              Icons.text_decrease,
+              canZoomOut,
+              onZoomOut,
+              colors.outline,
+            ),
             Container(
               width: 1,
               height: 14,
               margin: const EdgeInsets.symmetric(horizontal: 2),
-              color: AppColors.border,
+              color: colors.outline,
             ),
-            _zoomButton(Icons.text_increase, canZoomIn, onZoomIn),
+            _zoomButton(
+              Icons.text_increase,
+              canZoomIn,
+              onZoomIn,
+              colors.outline,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _zoomButton(IconData icon, bool enabled, VoidCallback onTap) {
+  Widget _zoomButton(
+    IconData icon,
+    bool enabled,
+    VoidCallback onTap,
+    Color disabledColor,
+  ) {
     return InkWell(
       onTap: enabled ? onTap : null,
       customBorder: const CircleBorder(),
@@ -59,7 +75,7 @@ class TextZoomControl extends StatelessWidget {
         child: Icon(
           icon,
           size: 16,
-          color: enabled ? AppColors.accent : AppColors.border,
+          color: enabled ? AppColors.accent : disabledColor,
         ),
       ),
     );

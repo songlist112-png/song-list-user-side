@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/models/artist.dart';
 import '../../../../shared/models/label.dart';
 import '../../application/board_detail_controller.dart';
@@ -57,6 +58,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
   late bool _showBpm;
   late bool _darkMode;
 
+  ColorScheme get _colors => AppTheme.forMode(darkMode: _darkMode).colorScheme;
+
   @override
   void initState() {
     super.initState();
@@ -70,204 +73,210 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom + 20;
     final isMutating = ref.watch(boardDetailIsMutatingProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.bgCard,
-      body: AbsorbPointer(
-        absorbing: isMutating,
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 8,
-              bottom: bottomPadding,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isMutating) ...[
-                    const LinearProgressIndicator(minHeight: 2),
+    return Theme(
+      data: AppTheme.forMode(darkMode: _darkMode),
+      child: Scaffold(
+        backgroundColor: _colors.surface,
+        body: AbsorbPointer(
+          absorbing: isMutating,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 8,
+                bottom: bottomPadding,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isMutating) ...[
+                      const LinearProgressIndicator(minHeight: 2),
+                      const SizedBox(height: 12),
+                    ],
+                    // Header
                     const SizedBox(height: 12),
-                  ],
-                  // Header
-                  const SizedBox(height: 12),
-                  const Center(
-                    child: Text(
-                      'Board Settings',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.text,
-                      ),
-                    ),
-                  ),
-                  if (widget.readOnly) ...[
-                    const SizedBox(height: 6),
-                    const Center(
+                    Center(
                       child: Text(
-                        'Admin-created board · read only',
+                        'Board Settings',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: _colors.onSurface,
                         ),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 20),
-
-                  // // Export / Import Section
-                  // _buildSection(
-                  //   title: 'DATA MANAGEMENT',
-                  //   child: Row(
-                  //     children: [
-                  //       Expanded(
-                  //         child: _buildActionButton(
-                  //           icon: Icons.upload_outlined,
-                  //           label: 'Export',
-                  //           onPressed: widget.onExport,
-                  //           isPrimary: true,
-                  //         ),
-                  //       ),
-                  //       const SizedBox(width: 12),
-                  //       Expanded(
-                  //         child: _buildActionButton(
-                  //           icon: Icons.download_outlined,
-                  //           label: 'Import',
-                  //           onPressed: widget.onImport,
-                  //           isPrimary: false,
-                  //         ),
-                  //       ),
-                  //     ],
-                  //   ),
-                  // ),
-
-                  // const SizedBox(height: 24),
-
-                  // Display Settings
-                  _buildSection(
-                    title: 'DISPLAY SETTINGS',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.border.withValues(alpha: 0.5),
+                    if (widget.readOnly) ...[
+                      const SizedBox(height: 6),
+                      Center(
+                        child: Text(
+                          'Admin-created board · read only',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _colors.onSurfaceVariant,
+                          ),
                         ),
                       ),
+                    ],
+                    const SizedBox(height: 20),
+
+                    // // Export / Import Section
+                    // _buildSection(
+                    //   title: 'DATA MANAGEMENT',
+                    //   child: Row(
+                    //     children: [
+                    //       Expanded(
+                    //         child: _buildActionButton(
+                    //           icon: Icons.upload_outlined,
+                    //           label: 'Export',
+                    //           onPressed: widget.onExport,
+                    //           isPrimary: true,
+                    //         ),
+                    //       ),
+                    //       const SizedBox(width: 12),
+                    //       Expanded(
+                    //         child: _buildActionButton(
+                    //           icon: Icons.download_outlined,
+                    //           label: 'Import',
+                    //           onPressed: widget.onImport,
+                    //           isPrimary: false,
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
+
+                    // const SizedBox(height: 24),
+
+                    // Display Settings
+                    _buildSection(
+                      title: 'DISPLAY SETTINGS',
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _colors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _colors.outline.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildSwitchTile(
+                              icon: Icons.person_outline,
+                              title: 'Show Artist',
+                              subtitle: 'Display artist names on song cards',
+                              value: _showArtist,
+                              onChanged: widget.readOnly
+                                  ? null
+                                  : (value) =>
+                                        unawaited(_changeShowArtist(value)),
+                            ),
+                            _buildDivider(),
+                            _buildSwitchTile(
+                              icon: Icons.speed,
+                              title: 'Show BPM',
+                              subtitle: 'Display tempo on song cards',
+                              value: _showBpm,
+                              onChanged: widget.readOnly
+                                  ? null
+                                  : (value) => unawaited(_changeShowBpm(value)),
+                            ),
+                            _buildDivider(),
+                            _buildSwitchTile(
+                              icon: Icons.dark_mode_outlined,
+                              title: 'Dark Mode',
+                              subtitle: 'Use dark theme colors',
+                              value: _darkMode,
+                              onChanged: (value) =>
+                                  unawaited(_changeDarkMode(value)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Artists Section
+                    _buildSection(
+                      title: 'ARTISTS (${widget.artists.length})',
                       child: Column(
                         children: [
-                          _buildSwitchTile(
-                            icon: Icons.person_outline,
-                            title: 'Show Artist',
-                            subtitle: 'Display artist names on song cards',
-                            value: _showArtist,
-                            onChanged: (value) =>
-                                unawaited(_changeShowArtist(value)),
-                          ),
-                          _buildDivider(),
-                          _buildSwitchTile(
-                            icon: Icons.speed,
-                            title: 'Show BPM',
-                            subtitle: 'Display tempo on song cards',
-                            value: _showBpm,
-                            onChanged: (value) =>
-                                unawaited(_changeShowBpm(value)),
-                          ),
-                          _buildDivider(),
-                          _buildSwitchTile(
-                            icon: Icons.dark_mode_outlined,
-                            title: 'Dark Mode',
-                            subtitle: 'Use dark theme colors',
-                            value: _darkMode,
-                            onChanged: (value) =>
-                                unawaited(_changeDarkMode(value)),
-                          ),
+                          if (widget.artists.isEmpty)
+                            _buildEmptyState(
+                              icon: Icons.person_outline,
+                              message: 'No artists added yet',
+                            )
+                          else
+                            ...widget.artists.map(
+                              (artist) => _buildListItem(
+                                title: artist.name,
+                                icon: Icons.person,
+                                onEdit: !widget.readOnly && artist.canEdit
+                                    ? () => widget.onUpdateArtist(artist)
+                                    : null,
+                                onDelete: !widget.readOnly && artist.canEdit
+                                    ? () => unawaited(
+                                        widget.onRemoveArtist(artist.id),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          if (!widget.readOnly) ...[
+                            const SizedBox(height: 8),
+                            _buildAddButton(
+                              label: 'Add Artist',
+                              icon: Icons.person_add_outlined,
+                              onPressed: widget.onAddArtist,
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // Artists Section
-                  _buildSection(
-                    title: 'ARTISTS (${widget.artists.length})',
-                    child: Column(
-                      children: [
-                        if (widget.artists.isEmpty)
-                          _buildEmptyState(
-                            icon: Icons.person_outline,
-                            message: 'No artists added yet',
-                          )
-                        else
-                          ...widget.artists.map(
-                            (artist) => _buildListItem(
-                              title: artist.name,
-                              icon: Icons.person,
-                              onEdit: !widget.readOnly && artist.canEdit
-                                  ? () => widget.onUpdateArtist(artist)
-                                  : null,
-                              onDelete: !widget.readOnly && artist.canEdit
-                                  ? () => unawaited(
-                                      widget.onRemoveArtist(artist.id),
-                                    )
-                                  : null,
+                    // Labels Section
+                    _buildSection(
+                      title: 'LABELS (${widget.labels.length})',
+                      child: Column(
+                        children: [
+                          if (widget.labels.isEmpty)
+                            _buildEmptyState(
+                              icon: Icons.label_outline,
+                              message: 'No labels added yet',
+                            )
+                          else
+                            ...widget.labels.map(
+                              (label) => _buildLabelItem(
+                                label: label,
+                                onEdit: !widget.readOnly && label.canEdit
+                                    ? () => widget.onUpdateLabel(label)
+                                    : null,
+                                onDelete: !widget.readOnly && label.canEdit
+                                    ? () => unawaited(
+                                        widget.onRemoveLabel(label.id),
+                                      )
+                                    : null,
+                              ),
                             ),
-                          ),
-                        if (!widget.readOnly) ...[
-                          const SizedBox(height: 8),
-                          _buildAddButton(
-                            label: 'Add Artist',
-                            icon: Icons.person_add_outlined,
-                            onPressed: widget.onAddArtist,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Labels Section
-                  _buildSection(
-                    title: 'LABELS (${widget.labels.length})',
-                    child: Column(
-                      children: [
-                        if (widget.labels.isEmpty)
-                          _buildEmptyState(
-                            icon: Icons.label_outline,
-                            message: 'No labels added yet',
-                          )
-                        else
-                          ...widget.labels.map(
-                            (label) => _buildLabelItem(
-                              label: label,
-                              onEdit: !widget.readOnly && label.canEdit
-                                  ? () => widget.onUpdateLabel(label)
-                                  : null,
-                              onDelete: !widget.readOnly && label.canEdit
-                                  ? () => unawaited(
-                                      widget.onRemoveLabel(label.id),
-                                    )
-                                  : null,
+                          if (!widget.readOnly) ...[
+                            const SizedBox(height: 8),
+                            _buildAddButton(
+                              label: 'Add Label',
+                              icon: Icons.add_circle_outline,
+                              onPressed: () => widget.onAddLabel(''),
                             ),
-                          ),
-                        if (!widget.readOnly) ...[
-                          const SizedBox(height: 8),
-                          _buildAddButton(
-                            label: 'Add Label',
-                            icon: Icons.add_circle_outline,
-                            onPressed: () => widget.onAddLabel(''),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 10),
-                ],
+                    const SizedBox(height: 10),
+                  ],
+                ),
               ),
             ),
           ),
@@ -305,10 +314,10 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMuted,
+              color: _colors.onSurfaceVariant,
               letterSpacing: 0.5,
             ),
           ),
@@ -387,18 +396,18 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.text,
+                    color: _colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textMuted,
+                    color: _colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -423,7 +432,7 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
   Widget _buildDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Divider(height: 1, color: AppColors.border.withValues(alpha: 0.3)),
+      child: Divider(height: 1, color: _colors.outline.withValues(alpha: 0.3)),
     );
   }
 
@@ -438,9 +447,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.bgCard,
+          color: _colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          border: Border.all(color: _colors.outline.withValues(alpha: 0.5)),
         ),
         child: Row(
           children: [
@@ -456,9 +465,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: AppColors.text,
+                  color: _colors.onSurface,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -501,9 +510,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.bgCard,
+          color: _colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          border: Border.all(color: _colors.outline.withValues(alpha: 0.5)),
         ),
         child: Row(
           children: [
@@ -526,9 +535,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
             Expanded(
               child: Text(
                 label.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: AppColors.text,
+                  color: _colors.onSurface,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -602,9 +611,9 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: _colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
+        border: Border.all(color: _colors.outline.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -612,14 +621,14 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
           Icon(
             icon,
             size: 24,
-            color: AppColors.textMuted.withValues(alpha: 0.5),
+            color: _colors.onSurfaceVariant.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 12),
           Text(
             message,
             style: TextStyle(
               fontSize: 14,
-              color: AppColors.textMuted.withValues(alpha: 0.7),
+              color: _colors.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),
         ],

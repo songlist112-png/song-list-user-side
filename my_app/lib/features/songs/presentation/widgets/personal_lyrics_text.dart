@@ -17,6 +17,10 @@ class PersonalLyricsText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final originalTextColor = colors.brightness == Brightness.dark
+        ? colors.onSurface
+        : Colors.black;
     final lines = classifyLyricLines(
       originalLyrics: originalLyrics,
       displayedLyrics: personalLyrics,
@@ -31,7 +35,7 @@ class PersonalLyricsText extends StatelessWidget {
                 style: TextStyle(
                   color: entry.$2.isPersonal
                       ? AppColors.personalEdit
-                      : Colors.black,
+                      : originalTextColor,
                 ),
               );
             })

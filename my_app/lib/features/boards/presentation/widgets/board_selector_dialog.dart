@@ -21,6 +21,7 @@ class BoardSelectorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
       child: Padding(
@@ -33,7 +34,7 @@ class BoardSelectorDialog extends StatelessWidget {
               alignment: Alignment.topRight,
               child: GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.close, color: AppColors.textMuted),
+                child: Icon(Icons.close, color: colors.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: 8),
@@ -63,14 +64,14 @@ class BoardSelectorDialog extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                             border: isActive
                                 ? null
-                                : Border.all(color: AppColors.border),
+                                : Border.all(color: colors.outline),
                           ),
                           child: Text(
                             list.name,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: isActive ? Colors.white : AppColors.text,
+                              color: isActive ? Colors.white : colors.onSurface,
                             ),
                           ),
                         ),
@@ -84,7 +85,7 @@ class BoardSelectorDialog extends StatelessWidget {
                         onPressed: () => onMenuTap?.call(list),
                         icon: const Icon(Icons.more_vert, size: 18),
                         padding: EdgeInsets.zero,
-                        color: AppColors.textMuted,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -106,14 +107,17 @@ class BoardSelectorDialog extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: AppColors.border,
+                    color: colors.outline,
                     style: BorderStyle.solid,
                   ),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '+ Create New Song List',
-                    style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),

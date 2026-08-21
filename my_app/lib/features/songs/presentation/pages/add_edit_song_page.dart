@@ -34,6 +34,8 @@ class AddEditSongPage extends StatefulWidget {
 }
 
 class _AddEditSongPageState extends State<AddEditSongPage> {
+  ColorScheme get _colors => Theme.of(context).colorScheme;
+
   late final TextEditingController _titleController;
   late final TextEditingController _tempoController;
   late final TextEditingController _lyricsController;
@@ -147,21 +149,21 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     final isEditing = widget.existingSong != null;
 
     return Scaffold(
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: _colors.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        foregroundColor: AppColors.text,
+        foregroundColor: _colors.onSurface,
         elevation: 0,
         title: Text(
           isEditing ? 'Edit Song' : 'New Song',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: AppColors.text,
+            color: _colors.onSurface,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.text, size: 24),
+          icon: Icon(Icons.close, color: _colors.onSurface, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -217,10 +219,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
@@ -233,15 +235,15 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             border: InputBorder.none,
                             hintText: 'Select artist',
                           ),
-                          dropdownColor: AppColors.bgCard,
+                          dropdownColor: _colors.surface,
                           items: widget.availableArtists.map((a) {
                             return DropdownMenuItem(
                               value: a,
                               child: Text(
                                 a,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                 ),
                               ),
                             );
@@ -307,10 +309,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                       flex: 2,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
@@ -322,15 +324,15 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             ),
                             border: InputBorder.none,
                           ),
-                          dropdownColor: AppColors.bgCard,
+                          dropdownColor: _colors.surface,
                           items: _keys.map((k) {
                             return DropdownMenuItem(
                               value: k,
                               child: Text(
                                 k,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                 ),
                               ),
                             );
@@ -346,10 +348,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                       flex: 3,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
@@ -361,15 +363,15 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             ),
                             border: InputBorder.none,
                           ),
-                          dropdownColor: AppColors.bgCard,
+                          dropdownColor: _colors.surface,
                           items: _keyTypes.map((t) {
                             return DropdownMenuItem(
                               value: t,
                               child: Text(
                                 t,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                 ),
                               ),
                             );
@@ -395,18 +397,20 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.bgColumn.withValues(alpha: 0.5),
+                      color: _colors.surfaceContainerHighest.withValues(
+                        alpha: 0.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.3),
+                        color: _colors.outline.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(
                           Icons.info_outline,
                           size: 18,
-                          color: AppColors.textMuted,
+                          color: _colors.onSurfaceVariant,
                         ),
                         SizedBox(width: 8),
                         Expanded(
@@ -414,7 +418,7 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             'No labels available. Add labels in the menu.',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.textMuted,
+                              color: _colors.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -448,12 +452,12 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? label.color.withValues(alpha: 0.15)
-                                  : AppColors.bgCard,
+                                  : _colors.surface,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: isSelected
                                     ? label.color
-                                    : AppColors.border.withValues(alpha: 0.5),
+                                    : _colors.outline.withValues(alpha: 0.5),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -486,8 +490,8 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: isSelected
-                                        ? AppColors.text
-                                        : AppColors.textMuted,
+                                        ? _colors.onSurface
+                                        : _colors.onSurfaceVariant,
                                     fontWeight: isSelected
                                         ? FontWeight.w600
                                         : FontWeight.w500,
@@ -511,24 +515,24 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.bgCard,
+                    color: _colors.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.border.withValues(alpha: 0.5),
+                      color: _colors.outline.withValues(alpha: 0.5),
                     ),
                   ),
                   child: TextField(
                     controller: _lyricsController,
                     maxLines: 6,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      color: AppColors.text,
+                      color: _colors.onSurface,
                       height: 1.5,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Enter lyrics or notes...',
                       hintStyle: TextStyle(
-                        color: AppColors.textMuted,
+                        color: _colors.onSurfaceVariant,
                         fontSize: 15,
                       ),
                       contentPadding: EdgeInsets.all(16),
@@ -616,10 +620,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: Row(
@@ -636,9 +640,9 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             Expanded(
                               child: Text(
                                 fileName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                   fontWeight: FontWeight.w500,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -667,10 +671,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                               const SizedBox(width: 4),
                             ],
                             IconButton(
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.close,
                                 size: 20,
-                                color: AppColors.textMuted,
+                                color: _colors.onSurfaceVariant,
                               ),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -705,10 +709,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMuted,
+              color: _colors.onSurfaceVariant,
               letterSpacing: 0.5,
             ),
           ),
@@ -732,18 +736,18 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.bgCard,
+            color: _colors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            border: Border.all(color: _colors.outline.withValues(alpha: 0.5)),
           ),
           child: TextField(
             controller: controller,
             keyboardType: keyboardType,
-            style: const TextStyle(fontSize: 15, color: AppColors.text),
+            style: TextStyle(fontSize: 15, color: _colors.onSurface),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: const TextStyle(
-                color: AppColors.textMuted,
+              hintStyle: TextStyle(
+                color: _colors.onSurfaceVariant,
                 fontSize: 15,
               ),
               contentPadding: const EdgeInsets.symmetric(
@@ -763,10 +767,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       children: [
         Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.text,
+            color: _colors.onSurface,
           ),
         ),
         if (isRequired)
