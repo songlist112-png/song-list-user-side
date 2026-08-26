@@ -39,4 +39,54 @@ void main() {
     expect(leftNeighbor.right, greaterThan(0));
     expect(rightNeighbor.left, lessThan(400));
   });
+
+  testWidgets('updates width while preserving selected column', (tester) async {
+    var wide = false;
+    late StateSetter update;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 500,
+                child: MagneticColumnPager(
+                  viewportFraction: wide
+                      ? MagneticColumnPager.wideViewportFraction
+                      : MagneticColumnPager.normalViewportFraction,
+                  itemCount: 5,
+                  itemBuilder: (_, index) => ColoredBox(
+                    key: ValueKey('column-$index'),
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.drag(find.byType(PageView), const Offset(-360, 0));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<PageView>(find.byType(PageView)).controller!.page,
+      closeTo(1, 0.01),
+    );
+
+    update(() => wide = true);
+    await tester.pumpAndSettle();
+
+    final controller = tester
+        .widget<PageView>(find.byType(PageView))
+        .controller!;
+    expect(
+      controller.viewportFraction,
+      MagneticColumnPager.wideViewportFraction,
+    );
+    expect(controller.page, closeTo(1, 0.01));
+  });
 }

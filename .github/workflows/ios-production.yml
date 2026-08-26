@@ -1,0 +1,100 @@
+name: iOS Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version to release"
+        required: true
+        type: string
+      build_number:
+        description: "Build number"
+        required: true
+        type: string
+
+jobs:
+  build-ios-production:
+    name: Build iOS Production
+    runs-on: macos-latest
+
+    defaults:
+      run:
+        working-directory: my_app
+
+    steps:
+      # --------------------------------------------------
+      # 1. Checkout
+      # --------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # --------------------------------------------------
+      # 2. Setup Flutter
+      # --------------------------------------------------
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # --------------------------------------------------
+      # 3. Dependencies
+      # --------------------------------------------------
+      - name: Get dependencies
+        run: flutter pub get
+
+      # --------------------------------------------------
+      # 4. Set version
+      # --------------------------------------------------
+      - name: Set app version
+        run: |
+          flutter pub run cider version \
+            ${{ inputs.version }}+${{ inputs.build_number }}
+
+      # --------------------------------------------------
+      # 5. Install CocoaPods
+      # --------------------------------------------------
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+
+      # --------------------------------------------------
+      # 6. Build production IPA
+      # --------------------------------------------------
+      - name: Build iOS IPA
+        run: flutter build ipa --release
+
+      # --------------------------------------------------
+      # 7. Install Fastlane
+      # --------------------------------------------------
+      - name: Install Fastlane
+        run: gem install fastlane
+
+      # --------------------------------------------------
+      # 8. Upload production build
+      # --------------------------------------------------
+      - name: Upload to App Store Connect
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p fastlane/private_keys
+
+          echo "$APP_STORE_CONNECT_API_KEY" \
+            | base64 --decode \
+            > fastlane/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+
+          fastlane pilot upload \
+            --ipa build/ios/ipa/*.ipa \
+            --api_key_path <(
+              cat <<EOF
+          {
+            "key_id": "$APP_STORE_CONNECT_KEY_ID",
+            "issuer_id": "$APP_STORE_CONNECT_ISSUER_ID",
+            "key": "$(cat fastlane/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 | base64 | tr -d '\n')",
+            "in_house": false
+          }
+          EOF
+          )

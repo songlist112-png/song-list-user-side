@@ -13,12 +13,16 @@ class MenuBottomSheet extends ConsumerStatefulWidget {
   final bool showArtist;
   final bool showBpm;
   final bool darkMode;
+  final bool viewMode;
+  final bool wideColumns;
   final List<Artist> artists;
   final List<Label> labels;
   final bool readOnly;
   final Future<bool> Function(bool) onShowArtistChanged;
   final Future<bool> Function(bool) onShowBpmChanged;
   final Future<bool> Function(bool) onDarkModeChanged;
+  final ValueChanged<bool> onViewModeChanged;
+  final ValueChanged<bool> onWideColumnsChanged;
   final VoidCallback onAddArtist;
   final Future<void> Function(String) onRemoveArtist;
   final ValueChanged<Artist> onUpdateArtist;
@@ -33,12 +37,16 @@ class MenuBottomSheet extends ConsumerStatefulWidget {
     required this.showArtist,
     required this.showBpm,
     required this.darkMode,
+    required this.viewMode,
+    required this.wideColumns,
     required this.artists,
     required this.labels,
     this.readOnly = false,
     required this.onShowArtistChanged,
     required this.onShowBpmChanged,
     required this.onDarkModeChanged,
+    required this.onViewModeChanged,
+    required this.onWideColumnsChanged,
     required this.onAddArtist,
     required this.onRemoveArtist,
     required this.onUpdateArtist,
@@ -57,6 +65,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
   late bool _showArtist;
   late bool _showBpm;
   late bool _darkMode;
+  late bool _viewMode;
+  late bool _wideColumns;
 
   ColorScheme get _colors => AppTheme.forMode(darkMode: _darkMode).colorScheme;
 
@@ -66,6 +76,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
     _showArtist = widget.showArtist;
     _showBpm = widget.showBpm;
     _darkMode = widget.darkMode;
+    _viewMode = widget.viewMode;
+    _wideColumns = widget.wideColumns;
   }
 
   @override
@@ -100,7 +112,7 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                     const SizedBox(height: 12),
                     Center(
                       child: Text(
-                        'Board Settings',
+                        'Settings',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -163,6 +175,24 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                         ),
                         child: Column(
                           children: [
+                            _buildSwitchTile(
+                              icon: Icons.visibility_outlined,
+                              title: 'View Mode',
+                              subtitle: 'Hide board editing controls',
+                              value: _viewMode,
+                              onChanged: widget.readOnly
+                                  ? null
+                                  : _changeViewMode,
+                            ),
+                            _buildDivider(),
+                            _buildSwitchTile(
+                              icon: Icons.width_wide_outlined,
+                              title: 'Wide Song Columns',
+                              subtitle: 'Give lyrics more horizontal space',
+                              value: _wideColumns,
+                              onChanged: _changeWideColumns,
+                            ),
+                            _buildDivider(),
                             _buildSwitchTile(
                               icon: Icons.person_outline,
                               title: 'Show Artist',
@@ -304,6 +334,16 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
     setState(() => _darkMode = value);
     final didSave = await widget.onDarkModeChanged(value);
     if (!didSave && mounted) setState(() => _darkMode = previous);
+  }
+
+  void _changeViewMode(bool value) {
+    setState(() => _viewMode = value);
+    widget.onViewModeChanged(value);
+  }
+
+  void _changeWideColumns(bool value) {
+    setState(() => _wideColumns = value);
+    widget.onWideColumnsChanged(value);
   }
 
   Widget _buildSection({required String title, required Widget child}) {
@@ -475,18 +515,18 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
             if (onEdit != null) ...[
               IconButton(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 20),
+                icon: const Icon(Icons.edit_outlined, size: 18),
                 tooltip: 'Edit',
               ),
               IconButton(
                 onPressed: onDelete,
                 icon: const Icon(
                   Icons.delete_outline,
-                  size: 20,
+                  size: 18,
                   color: Colors.red,
                 ),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                // constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 tooltip: 'Remove',
               ),
             ] else
@@ -624,11 +664,14 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
             color: _colors.onSurfaceVariant.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 12),
-          Text(
-            message,
-            style: TextStyle(
-              fontSize: 14,
-              color: _colors.onSurfaceVariant.withValues(alpha: 0.7),
+          Flexible(
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: _colors.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
             ),
           ),
         ],

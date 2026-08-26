@@ -347,24 +347,24 @@ class _LyricsSectionState extends ConsumerState<_LyricsSection> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Icon(
-              Icons.lyrics,
-              size: 14,
-              color: hasPersonalEdit
-                  ? AppColors.personalEdit
-                  : colors.onSurfaceVariant,
-            ),
+            // Icon(
+            //   Icons.lyrics,
+            //   size: 14,
+            //   color: hasPersonalEdit
+            //       ? AppColors.personalEdit
+            //       : colors.onSurfaceVariant,
+            // ),
             const SizedBox(width: 6),
-            Text(
-              hasPersonalEdit ? 'Personal lyrics & notes' : 'Lyrics',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: hasPersonalEdit
-                    ? AppColors.personalEdit
-                    : colors.onSurfaceVariant,
-              ),
-            ),
+            // Text(
+            //   hasPersonalEdit ? 'Personal lyrics & notes' : 'Lyrics',
+            //   style: TextStyle(
+            //     fontSize: 12,
+            //     fontWeight: FontWeight.w600,R
+            //     color: hasPersonalEdit
+            //         ? AppColors.personalEdit
+            //         : colors.onSurfaceVariant,
+            //   ),
+            // ),
             const Spacer(),
             if (widget.isViewMode)
               TextZoomControl(

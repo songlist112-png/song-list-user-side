@@ -95,7 +95,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   // View mode state
   bool _isViewMode = false;
-  bool _isEditMode = false;
+  bool _wideSongColumns = false;
 
   // Search state
   bool _isSearchMode = false;
@@ -582,6 +582,16 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
+  void _setViewMode(bool enabled) {
+    if (!mounted || _isViewMode == enabled) return;
+    setState(() => _isViewMode = enabled);
+  }
+
+  void _setWideSongColumns(bool enabled) {
+    if (!mounted || _wideSongColumns == enabled) return;
+    setState(() => _wideSongColumns = enabled);
+  }
+
   Future<void> _removeLabel(String id) async {
     try {
       await _repository.deleteLabel(id);
@@ -605,11 +615,15 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
       builder: (_) => _applyBoardTheme(
         MenuBottomSheet(
           readOnly: !_songList.canEdit,
+          viewMode: _isViewMode || !_songList.canEdit,
+          wideColumns: _wideSongColumns,
           showArtist: _songList.showArtist,
           showBpm: _songList.showBpm,
           darkMode: _globalDarkMode,
           artists: _songList.artists,
           labels: _songList.labels,
+          onViewModeChanged: _setViewMode,
+          onWideColumnsChanged: _setWideSongColumns,
           onShowArtistChanged: (val) =>
               _saveBoard(_songList.copyWith(showArtist: val)),
           onShowBpmChanged: (val) =>
@@ -1085,7 +1099,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         _activeKey != null ||
         _activeAccidental != null ||
         _searchQuery.isNotEmpty;
-    final canMutate = _songList.canEdit && (!_isViewMode || _isEditMode);
+    final canMutate = _songList.canEdit && !_isViewMode;
     final canReorder = !hasFilters && canMutate;
     final globalTheme = AppTheme.forMode(
       darkMode: ref.watch(settingsProvider).valueOrNull?.darkMode ?? false,
@@ -1150,30 +1164,17 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                       onPressed: _showMenu,
                     ),
                     // Toggle between Edit and View icons
-                    if (_songList.canEdit)
-                      IconButton(
-                        icon: Icon(
-                          _isViewMode && !_isEditMode
-                              ? Icons.edit
-                              : Icons.visibility,
-                          size: _isViewMode && !_isEditMode ? 20 : 22,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            if (!_isViewMode) {
-                              // Click eye icon Ã¢â€ â€™ enter view mode
-                              _isViewMode = true;
-                              _isEditMode = false;
-                            } else if (!_isEditMode) {
-                              // Click edit icon Ã¢â€ â€™ enter edit mode
-                              _isEditMode = true;
-                            } else {
-                              // Click eye icon again Ã¢â€ â€™ exit edit mode, stay in view mode
-                              _isEditMode = false;
-                            }
-                          });
-                        },
-                      ),
+                    // if (_songList.canEdit)
+                    //   IconButton(
+                    //     tooltip: _isViewMode
+                    //         ? 'Switch to edit mode'
+                    //         : 'Switch to view mode',
+                    //     icon: Icon(
+                    //       _isViewMode ? Icons.edit : Icons.visibility,
+                    //       size: _isViewMode ? 20 : 22,
+                    //     ),
+                    //     onPressed: () => _setViewMode(!_isViewMode),
+                    //   ),
                   ],
           ),
           body: Column(
@@ -1287,6 +1288,9 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                     : Padding(
                         padding: const EdgeInsets.only(top: 4, bottom: 16),
                         child: MagneticColumnPager(
+                          viewportFraction: _wideSongColumns
+                              ? MagneticColumnPager.wideViewportFraction
+                              : MagneticColumnPager.normalViewportFraction,
                           itemCount: filteredColumns.length,
                           itemBuilder: (_, index) => _buildColumnPage(
                             filteredColumns[index],

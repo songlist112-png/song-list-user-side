@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -10,6 +11,8 @@ import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_attachment.dart';
 import '../../../../shared/utils/media_type.dart';
+
+enum _AttachmentAction { view, download, remove }
 
 class AddEditSongPage extends StatefulWidget {
   final Song? existingSong;
@@ -19,6 +22,7 @@ class AddEditSongPage extends StatefulWidget {
   final Future<void> Function()? onDelete;
   final Future<String?> Function()? onAddArtist;
   final Future<Uint8List> Function(SongAttachment)? onDownloadAttachment;
+  final Future<void> Function(String path, String mediaType)? onOpenAttachment;
 
   const AddEditSongPage({
     super.key,
@@ -29,6 +33,7 @@ class AddEditSongPage extends StatefulWidget {
     this.onDelete,
     this.onAddArtist,
     this.onDownloadAttachment,
+    this.onOpenAttachment,
   });
 
   @override
@@ -684,41 +689,22 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // Download button for all files when editing
-                            if (isEditing) ...[
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.download,
-                                  size: 20,
-                                  color: AppColors.accent,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 36,
-                                  minHeight: 36,
-                                ),
-                                tooltip: 'Download file',
-                                onPressed:
-                                    attachment.storagePath == null ||
-                                        widget.onDownloadAttachment == null
-                                    ? null
-                                    : () => _downloadAttachment(attachment),
-                              ),
-                              const SizedBox(width: 4),
-                            ],
                             IconButton(
-                              icon: Icon(
-                                Icons.close,
-                                size: 20,
-                                color: _colors.onSurfaceVariant,
-                              ),
+                              icon: const Icon(Icons.more_vert, size: 20),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
                                 minWidth: 36,
                                 minHeight: 36,
                               ),
-                              tooltip: 'Remove',
-                              onPressed: () => _removeAttachment(index),
+                              tooltip: 'Attachment actions',
+                              onPressed: () => _showAttachmentActions(
+                                attachment,
+                                index,
+                                canDownload:
+                                    isEditing &&
+                                    attachment.storagePath != null &&
+                                    widget.onDownloadAttachment != null,
+                              ),
                             ),
                           ],
                         ),
@@ -860,6 +846,117 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     setState(() {
       _attachments.removeAt(index);
     });
+  }
+
+  bool _canViewAttachment(SongAttachment attachment) {
+    return attachment.localPath != null ||
+        (attachment.storagePath != null && widget.onDownloadAttachment != null);
+  }
+
+  Future<void> _showAttachmentActions(
+    SongAttachment attachment,
+    int index, {
+    required bool canDownload,
+  }) async {
+    final action = await showModalBottomSheet<_AttachmentAction>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: _colors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined),
+              title: const Text('View'),
+              enabled: _canViewAttachment(attachment),
+              onTap: _canViewAttachment(attachment)
+                  ? () => Navigator.pop(sheetContext, _AttachmentAction.view)
+                  : null,
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_outlined),
+              title: const Text('Download'),
+              enabled: canDownload,
+              onTap: canDownload
+                  ? () =>
+                        Navigator.pop(sheetContext, _AttachmentAction.download)
+                  : null,
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Remove', style: TextStyle(color: Colors.red)),
+              onTap: () =>
+                  Navigator.pop(sheetContext, _AttachmentAction.remove),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _AttachmentAction.view:
+        await _viewAttachment(attachment);
+      case _AttachmentAction.download:
+        await _downloadAttachment(attachment);
+      case _AttachmentAction.remove:
+        _removeAttachment(index);
+    }
+  }
+
+  Future<void> _viewAttachment(SongAttachment attachment) async {
+    try {
+      final openAttachment = widget.onOpenAttachment;
+      final localPath = attachment.localPath;
+      if (openAttachment != null && localPath != null) {
+        await openAttachment(localPath, attachment.fileType);
+        return;
+      }
+
+      final file = await _resolveAttachmentFile(attachment);
+      if (openAttachment != null) {
+        await openAttachment(file.path, attachment.fileType);
+        return;
+      }
+
+      final result = await OpenFilex.open(file.path, type: attachment.fileType);
+      if (result.type != ResultType.done) {
+        throw FileSystemException(result.message, file.path);
+      }
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open attachment: $error')),
+      );
+    }
+  }
+
+  Future<File> _resolveAttachmentFile(SongAttachment attachment) async {
+    final localPath = attachment.localPath;
+    if (localPath != null) {
+      final localFile = File(localPath);
+      if (await localFile.exists()) return localFile;
+    }
+
+    final downloadAttachment = widget.onDownloadAttachment;
+    if (attachment.storagePath == null || downloadAttachment == null) {
+      throw FileSystemException('Attachment file is unavailable', localPath);
+    }
+
+    final bytes = await downloadAttachment(attachment);
+    final directory = await getTemporaryDirectory();
+    final safeId = (attachment.id ?? 'attachment').replaceAll(
+      RegExp(r'[^a-zA-Z0-9_-]'),
+      '_',
+    );
+    final safeName = attachment.name.replaceAll(
+      RegExp(r'[^a-zA-Z0-9._-]'),
+      '_',
+    );
+    final file = File('${directory.path}/${safeId}_$safeName');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
   }
 
   Future<void> _downloadAttachment(SongAttachment attachment) async {

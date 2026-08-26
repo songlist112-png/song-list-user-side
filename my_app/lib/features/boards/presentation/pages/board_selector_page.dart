@@ -508,7 +508,7 @@ class _BoardTabs extends StatelessWidget {
               children: [
                 Icon(Icons.library_music_rounded, color: AppColors.accent),
                 SizedBox(width: 8),
-                Text('Play Lists'),
+                Text('Song Lists'),
               ],
             ),
           ),
@@ -783,7 +783,7 @@ class _ProfileMenu extends ConsumerWidget {
       elevation: 12,
       color: colors.surface,
       surfaceTintColor: Colors.transparent,
-      shadowColor: colors.onSurface.withValues(alpha: 0.25),
+
       padding: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),

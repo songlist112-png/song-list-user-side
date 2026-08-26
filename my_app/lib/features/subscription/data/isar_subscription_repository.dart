@@ -69,7 +69,7 @@ class IsarSubscriptionRepository implements SubscriptionRepository {
     final existing = await _isar.subscriptions.getByUserId(userId);
     final record = existing ?? Subscription()
       ..userId = userId
-      ..trialLimitSeconds = 10800
+      ..trialLimitSeconds = Subscription.defaultTrialLimitSeconds
       ..trialUsedSeconds = 0;
     record
       ..plan = entitlement.plan

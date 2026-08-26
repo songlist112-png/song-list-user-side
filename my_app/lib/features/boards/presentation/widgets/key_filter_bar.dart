@@ -48,7 +48,7 @@ class KeyFilterBar extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 10),
 
                   // Flat button
                   _buildFilterChip(
@@ -75,6 +75,8 @@ class KeyFilterBar extends StatelessWidget {
                       }
                     },
                   ),
+
+                  const SizedBox(width: 10),
 
                   // Clear button
                   _buildFilterChip(
@@ -108,7 +110,7 @@ class KeyFilterBar extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: isCancel
-                ? Colors.red.shade400
+                ? AppColors.bgDark
                 : isActive
                 ? AppColors.filterBtnActive
                 : AppColors.filterBtnBg,
