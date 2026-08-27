@@ -5,6 +5,8 @@ class MagneticColumnPager extends StatefulWidget {
   const MagneticColumnPager({
     required this.itemCount,
     required this.itemBuilder,
+    this.initialPage = 0,
+    this.onPageChanged,
     this.viewportFraction = normalViewportFraction,
     this.trailing,
     super.key,
@@ -15,6 +17,8 @@ class MagneticColumnPager extends StatefulWidget {
 
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
+  final int initialPage;
+  final ValueChanged<int>? onPageChanged;
   final double viewportFraction;
   final Widget? trailing;
 
@@ -30,7 +34,10 @@ class _MagneticColumnPagerState extends State<MagneticColumnPager> {
   @override
   void initState() {
     super.initState();
-    _controller = _createController();
+    final lastPage = _pageCount > 0 ? _pageCount - 1 : 0;
+    _controller = _createController(
+      initialPage: widget.initialPage.clamp(0, lastPage),
+    );
   }
 
   @override
@@ -86,6 +93,7 @@ class _MagneticColumnPagerState extends State<MagneticColumnPager> {
       padEnds: true,
       pageSnapping: true,
       allowImplicitScrolling: true,
+      onPageChanged: widget.onPageChanged,
       itemBuilder: (context, index) {
         final child = index < widget.itemCount
             ? widget.itemBuilder(context, index)

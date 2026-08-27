@@ -16,6 +16,7 @@ import '../../../songs/data/isar_personal_song_edit_repository.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../../songs/presentation/pages/personal_song_edit_page.dart';
 import '../../application/board_detail_controller.dart';
+import '../../data/last_board_store.dart';
 import '../../data/board_repository.dart';
 import '../../domain/board_filter.dart';
 import '../../domain/song_reorder.dart';
@@ -29,8 +30,15 @@ import '../widgets/song_column_widget.dart';
 
 class BoardViewPage extends ConsumerStatefulWidget {
   final String boardId;
+  final Future<void> Function()? onExit;
+  final Future<void> Function()? onRestoredBoardUnavailable;
 
-  const BoardViewPage({super.key, required this.boardId});
+  const BoardViewPage({
+    super.key,
+    required this.boardId,
+    this.onExit,
+    this.onRestoredBoardUnavailable,
+  });
 
   @override
   ConsumerState<BoardViewPage> createState() => _BoardViewPageState();
@@ -108,6 +116,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   StreamSubscription<void>? _boardSubscription;
   int _pendingReorders = 0;
   int _localBoardRevision = 0;
+  int _initialColumnIndex = 0;
 
   BoardRepository get _repository => ref.read(boardRepositoryProvider);
 
@@ -158,17 +167,50 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
     try {
       final board = await _repository.fetchBoard(widget.boardId);
+      final rememberedColumnIndex = showLoading
+          ? await _readRememberedColumnIndex()
+          : _initialColumnIndex;
+      final lastColumnIndex = board.columns.isEmpty
+          ? 0
+          : board.columns.length - 1;
       if (mounted && _pendingReorders == 0 && revision == _localBoardRevision) {
-        setState(() => _songList = board);
+        setState(() {
+          _songList = board;
+          _initialColumnIndex = rememberedColumnIndex.clamp(0, lastColumnIndex);
+        });
       }
+    } on StateError catch (error) {
+      await _handleLoadError(
+        error,
+        showLoading: showLoading,
+        canFallback: true,
+      );
     } on Exception catch (error) {
-      if (showLoading) {
-        if (mounted) setState(() => _loadError = error);
-      } else {
-        debugPrint('Silent board refresh failed: $error');
-      }
+      await _handleLoadError(
+        error,
+        showLoading: showLoading,
+        canFallback: false,
+      );
     } finally {
       if (showLoading && mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleLoadError(
+    Object error, {
+    required bool showLoading,
+    required bool canFallback,
+  }) async {
+    if (showLoading &&
+        canFallback &&
+        widget.onRestoredBoardUnavailable != null) {
+      await widget.onRestoredBoardUnavailable!();
+      return;
+    }
+    if (showLoading) {
+      if (mounted) setState(() => _loadError = error);
+    } else {
+      debugPrint('Silent board refresh failed: $error');
     }
   }
 
@@ -177,6 +219,25 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('Could not save change: $error')));
+  }
+
+  Future<int> _readRememberedColumnIndex() async {
+    try {
+      return await ref.read(lastBoardStoreProvider).readColumnIndex();
+    } on Exception catch (error, stackTrace) {
+      debugPrint('Could not restore board column: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return 0;
+    }
+  }
+
+  Future<void> _rememberColumnIndex(int index) async {
+    try {
+      await ref.read(lastBoardStoreProvider).saveColumnIndex(index);
+    } on Exception catch (error, stackTrace) {
+      debugPrint('Could not remember board column: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   void _onSearchChanged() {
@@ -240,39 +301,41 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   Widget _buildSearchSuggestions(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(
-          bottom: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
+    return Material(
+      color: colors.surface,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
+          ),
         ),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _searchSuggestions.length,
-        separatorBuilder: (_, _) => Divider(
-          height: 1,
-          color: colors.outline.withValues(alpha: 0.3),
-          indent: 16,
-          endIndent: 16,
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          itemCount: _searchSuggestions.length,
+          separatorBuilder: (_, _) => Divider(
+            height: 1,
+            color: colors.outline.withValues(alpha: 0.3),
+            indent: 16,
+            endIndent: 16,
+          ),
+          itemBuilder: (context, index) {
+            final suggestion = _searchSuggestions[index];
+            return ListTile(
+              leading: Icon(
+                Icons.search,
+                size: 18,
+                color: colors.onSurfaceVariant,
+              ),
+              title: Text(
+                suggestion,
+                style: TextStyle(fontSize: 15, color: colors.onSurface),
+              ),
+              onTap: () => _onSuggestionSelected(suggestion),
+            );
+          },
         ),
-        itemBuilder: (context, index) {
-          final suggestion = _searchSuggestions[index];
-          return ListTile(
-            leading: Icon(
-              Icons.search,
-              size: 18,
-              color: colors.onSurfaceVariant,
-            ),
-            title: Text(
-              suggestion,
-              style: TextStyle(fontSize: 15, color: colors.onSurface),
-            ),
-            onTap: () => _onSuggestionSelected(suggestion),
-          );
-        },
       ),
     );
   }
@@ -1062,11 +1125,20 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     });
   }
 
+  void _submitSearch([String? value]) {
+    final query = value ?? _searchController.text;
+    unawaited(ref.read(searchHistoryProvider.notifier).addSearch(query));
+    _hideSuggestions();
+    _searchFocusNode.unfocus();
+  }
+
   void _closeSearch() {
+    _searchController.clear();
+    _debounceTimer?.cancel();
     setState(() {
       _isSearchMode = false;
-      _searchController.clear();
       _searchQuery = '';
+      _searchSuggestions = [];
     });
   }
 
@@ -1112,10 +1184,11 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           backgroundColor: AppColors.bg,
           appBar: AppBar(
             leading: IconButton(
-              icon: Icon(_isSearchMode ? Icons.arrow_back : Icons.arrow_back),
+              tooltip: _isSearchMode ? 'Cancel search' : 'Back',
+              icon: const Icon(Icons.arrow_back),
               onPressed: _isSearchMode
                   ? _closeSearch
-                  : () => Navigator.of(context).pop(),
+                  : widget.onExit ?? () => Navigator.of(context).pop(),
             ),
             title: _isSearchMode
                 ? TextField(
@@ -1135,26 +1208,21 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                       fillColor: Colors.transparent,
                       contentPadding: EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onSubmitted: (value) {
-                      ref.read(searchHistoryProvider.notifier).addSearch(value);
-                      _hideSuggestions();
-                      _searchFocusNode.unfocus();
-                    },
+                    onSubmitted: _submitSearch,
                   )
                 : Text(_songList.name),
             actions: _isSearchMode
                 ? [
-                    if (_searchQuery.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 22),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
-                      ),
+                    IconButton(
+                      tooltip: 'Search songs',
+                      icon: const Icon(Icons.search, size: 22),
+                      onPressed: _submitSearch,
+                    ),
                   ]
                 : [
                     // Search
                     IconButton(
+                      tooltip: 'Search',
                       icon: const Icon(Icons.search, size: 22),
                       onPressed: _showSearch,
                     ),
@@ -1181,7 +1249,10 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
             children: [
               // Search suggestions overlay
               if (_isSearchMode && _searchSuggestions.isNotEmpty)
-                _buildSearchSuggestions(context),
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: _buildSearchSuggestions(context),
+                ),
 
               // Key filter bar - hide when search has no results
               if (filteredColumns.isNotEmpty)
@@ -1288,6 +1359,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                     : Padding(
                         padding: const EdgeInsets.only(top: 4, bottom: 16),
                         child: MagneticColumnPager(
+                          initialPage: _initialColumnIndex,
                           viewportFraction: _wideSongColumns
                               ? MagneticColumnPager.wideViewportFraction
                               : MagneticColumnPager.normalViewportFraction,
@@ -1297,6 +1369,13 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                             canMutate: canMutate,
                             canReorder: canReorder,
                           ),
+                          onPageChanged: hasFilters
+                              ? null
+                              : (index) {
+                                  if (index < _songList.columns.length) {
+                                    unawaited(_rememberColumnIndex(index));
+                                  }
+                                },
                           trailing: canMutate
                               ? AddColumnButton(onTap: _addColumn)
                               : null,

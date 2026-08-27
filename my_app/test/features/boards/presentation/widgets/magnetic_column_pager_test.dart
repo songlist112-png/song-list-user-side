@@ -89,4 +89,38 @@ void main() {
     );
     expect(controller.page, closeTo(1, 0.01));
   });
+
+  testWidgets('restores initial column and reports page changes', (
+    tester,
+  ) async {
+    var selectedPage = -1;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 500,
+            child: MagneticColumnPager(
+              initialPage: 2,
+              itemCount: 4,
+              onPageChanged: (index) => selectedPage = index,
+              itemBuilder: (_, index) => ColoredBox(
+                key: ValueKey('column-$index'),
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final controller = tester
+        .widget<PageView>(find.byType(PageView))
+        .controller!;
+    expect(controller.page, 2);
+
+    await tester.drag(find.byType(PageView), const Offset(-360, 0));
+    await tester.pumpAndSettle();
+    expect(selectedPage, 3);
+  });
 }

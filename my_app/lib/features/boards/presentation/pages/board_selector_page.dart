@@ -14,6 +14,7 @@ import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../profile/providers/current_profile_provider.dart';
 import '../../data/board_repository.dart';
+import '../../data/last_board_store.dart';
 import '../widgets/name_prompt_dialog.dart';
 
 class BoardSelectorPage extends ConsumerStatefulWidget {
@@ -184,6 +185,7 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
   }
 
   Future<void> _signOut() async {
+    await _clearRememberedBoard();
     await ref.read(authControllerProvider).signOut();
     if (mounted) {
       AppSnackbar.showSuccess(context, 'Signed out successfully');
@@ -323,8 +325,28 @@ class _BoardSelectorPageState extends ConsumerState<BoardSelectorPage>
   }
 
   Future<void> _openBoard(SongList board) async {
+    await _rememberBoard(board.id);
+    if (!mounted) return;
     await context.push('/board/${board.id}');
     if (mounted) _reload();
+  }
+
+  Future<void> _rememberBoard(String boardId) async {
+    try {
+      await ref.read(lastBoardStoreProvider).save(boardId);
+    } on Exception catch (error, stackTrace) {
+      debugPrint('Could not remember open board: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _clearRememberedBoard() async {
+    try {
+      await ref.read(lastBoardStoreProvider).clear();
+    } on Exception catch (error, stackTrace) {
+      debugPrint('Could not clear remembered board: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 }
 

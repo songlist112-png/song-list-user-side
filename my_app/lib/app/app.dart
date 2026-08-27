@@ -2,15 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/services/screen_capture_protection.dart';
 import '../features/settings/presentation/providers/settings_provider.dart';
-import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
 class MyApp extends ConsumerStatefulWidget {
-  const MyApp({super.key});
+  const MyApp({required this.router, super.key});
+
+  final GoRouter router;
 
   @override
   ConsumerState<MyApp> createState() => _MyAppState();
@@ -49,7 +51,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
-      routerConfig: appRouter,
+      routerConfig: widget.router,
     );
   }
 }
