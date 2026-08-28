@@ -610,7 +610,7 @@ class _BoardTile extends StatelessWidget {
     );
     return Material(
       color: colors.surface,
-      elevation: 1.5,
+      // elevation: 1.5,
       shadowColor: colors.onSurface.withValues(alpha: 0.16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
