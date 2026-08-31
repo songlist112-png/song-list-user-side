@@ -114,6 +114,25 @@ void main() {
       AppColors.bgCardDark,
     );
   });
+
+  testWidgets('profile menu places Settings after Help & Feedback', (
+    tester,
+  ) async {
+    final changes = StreamController<void>();
+    addTearDown(changes.close);
+    final repository = _stubRepository(changes, const []);
+
+    await _pumpSelector(tester, repository, openMyBoards: false);
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+
+    final supportTop = tester.getTopLeft(find.text('Help & Feedback')).dy;
+    final settingsTop = tester.getTopLeft(find.text('Settings')).dy;
+    final logoutTop = tester.getTopLeft(find.text('Log Out')).dy;
+    expect(settingsTop, greaterThan(supportTop));
+    expect(settingsTop, lessThan(logoutTop));
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+  });
 }
 
 Future<void> _exerciseBoardCrud(WidgetTester tester) async {

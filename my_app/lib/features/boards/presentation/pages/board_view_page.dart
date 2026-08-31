@@ -11,6 +11,7 @@ import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_column.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../settings/domain/entities/user_preferences.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../songs/data/isar_personal_song_edit_repository.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
@@ -51,6 +52,12 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   bool get _globalDarkMode =>
       ref.read(settingsProvider).valueOrNull?.darkMode ?? false;
+
+  bool get _globalViewMode =>
+      ref.read(settingsProvider).valueOrNull?.viewMode ?? false;
+
+  bool get _globalWideSongColumns =>
+      ref.read(settingsProvider).valueOrNull?.wideSongColumns ?? false;
 
   ThemeData get _boardTheme => AppTheme.forMode(darkMode: _globalDarkMode);
 
@@ -102,9 +109,6 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   String? _activeAccidental;
 
   // View mode state
-  bool _isViewMode = false;
-  bool _wideSongColumns = false;
-
   // Search state
   bool _isSearchMode = false;
   final TextEditingController _searchController = TextEditingController();
@@ -646,13 +650,29 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   }
 
   void _setViewMode(bool enabled) {
-    if (!mounted || _isViewMode == enabled) return;
-    setState(() => _isViewMode = enabled);
+    if (!mounted || _globalViewMode == enabled) return;
+    unawaited(_updateViewMode(enabled));
   }
 
   void _setWideSongColumns(bool enabled) {
-    if (!mounted || _wideSongColumns == enabled) return;
-    setState(() => _wideSongColumns = enabled);
+    if (!mounted || _globalWideSongColumns == enabled) return;
+    unawaited(_updateWideSongColumns(enabled));
+  }
+
+  Future<void> _updateViewMode(bool enabled) async {
+    try {
+      await ref.read(settingsProvider.notifier).updateViewMode(enabled);
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
+
+  Future<void> _updateWideSongColumns(bool enabled) async {
+    try {
+      await ref.read(settingsProvider.notifier).updateWideSongColumns(enabled);
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   Future<void> _removeLabel(String id) async {
@@ -678,8 +698,8 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
       builder: (_) => _applyBoardTheme(
         MenuBottomSheet(
           readOnly: !_songList.canEdit,
-          viewMode: _isViewMode || !_songList.canEdit,
-          wideColumns: _wideSongColumns,
+          viewMode: _globalViewMode || !_songList.canEdit,
+          wideColumns: _globalWideSongColumns,
           showArtist: _songList.showArtist,
           showBpm: _songList.showBpm,
           darkMode: _globalDarkMode,
@@ -1144,7 +1164,8 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final settingsState = ref.watch(settingsProvider);
+    if (_isLoading || settingsState.isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.bg,
         body: Center(child: CircularProgressIndicator()),
@@ -1171,11 +1192,10 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         _activeKey != null ||
         _activeAccidental != null ||
         _searchQuery.isNotEmpty;
-    final canMutate = _songList.canEdit && !_isViewMode;
+    final preferences = settingsState.valueOrNull ?? const UserPreferences();
+    final canMutate = _songList.canEdit && !preferences.viewMode;
     final canReorder = !hasFilters && canMutate;
-    final globalTheme = AppTheme.forMode(
-      darkMode: ref.watch(settingsProvider).valueOrNull?.darkMode ?? false,
-    );
+    final globalTheme = AppTheme.forMode(darkMode: preferences.darkMode);
 
     return Theme(
       data: globalTheme,
@@ -1360,7 +1380,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                         padding: const EdgeInsets.only(top: 4, bottom: 16),
                         child: MagneticColumnPager(
                           initialPage: _initialColumnIndex,
-                          viewportFraction: _wideSongColumns
+                          viewportFraction: preferences.wideSongColumns
                               ? MagneticColumnPager.wideViewportFraction
                               : MagneticColumnPager.normalViewportFraction,
                           itemCount: filteredColumns.length,

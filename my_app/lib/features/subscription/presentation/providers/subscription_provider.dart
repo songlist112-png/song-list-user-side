@@ -128,8 +128,8 @@ class SubscriptionGateController extends StateNotifier<SubscriptionGateState> {
     DateTime now,
   ) {
     final expiration = entitlement.expiresAt;
-    final deadline = expiration != null &&
-            expiration.isBefore(entitlement.offlineGraceUntil)
+    final deadline =
+        expiration != null && expiration.isBefore(entitlement.offlineGraceUntil)
         ? expiration
         : entitlement.offlineGraceUntil;
     _accessDeadlineTimer = Timer(deadline.difference(now), () {

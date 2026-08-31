@@ -120,18 +120,18 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                         ),
                       ),
                     ),
-                    if (widget.readOnly) ...[
-                      const SizedBox(height: 6),
-                      Center(
-                        child: Text(
-                          'Admin-created board · read only',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
+                    // if (widget.readOnly) ...[
+                    //   const SizedBox(height: 6),
+                    //   Center(
+                    //     child: Text(
+                    //       'Admin-created board · read only',
+                    //       style: TextStyle(
+                    //         fontSize: 12,
+                    //         color: _colors.onSurfaceVariant,
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ],
                     const SizedBox(height: 20),
 
                     // // Export / Import Section
@@ -180,9 +180,7 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                               title: 'View Mode',
                               subtitle: 'Hide board editing controls',
                               value: _viewMode,
-                              onChanged: widget.readOnly
-                                  ? null
-                                  : _changeViewMode,
+                              onChanged: _changeViewMode,
                             ),
                             _buildDivider(),
                             _buildSwitchTile(
@@ -198,10 +196,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                               title: 'Show Artist',
                               subtitle: 'Display artist names on song cards',
                               value: _showArtist,
-                              onChanged: widget.readOnly
-                                  ? null
-                                  : (value) =>
-                                        unawaited(_changeShowArtist(value)),
+                              onChanged: (value) =>
+                                  unawaited(_changeShowArtist(value)),
                             ),
                             _buildDivider(),
                             _buildSwitchTile(
@@ -209,9 +205,8 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                               title: 'Show BPM',
                               subtitle: 'Display tempo on song cards',
                               value: _showBpm,
-                              onChanged: widget.readOnly
-                                  ? null
-                                  : (value) => unawaited(_changeShowBpm(value)),
+                              onChanged: (value) =>
+                                  unawaited(_changeShowBpm(value)),
                             ),
                             _buildDivider(),
                             _buildSwitchTile(

@@ -9,6 +9,7 @@ import 'package:my_app/features/boards/data/board_repository.dart';
 import 'package:my_app/features/boards/data/last_board_store.dart';
 import 'package:my_app/features/boards/presentation/pages/board_route_page.dart';
 import 'package:my_app/features/boards/presentation/pages/board_view_page.dart';
+import 'package:my_app/features/boards/presentation/widgets/song_column_widget.dart';
 import 'package:my_app/features/settings/domain/entities/user_preferences.dart';
 import 'package:my_app/features/settings/domain/repositories/settings_repository.dart';
 import 'package:my_app/features/settings/presentation/providers/settings_provider.dart';
@@ -89,6 +90,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('uses persisted view mode and wide column preferences', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _pumpBoardPage(
+      tester,
+      canEdit: true,
+      preferences: const UserPreferences(viewMode: true, wideSongColumns: true),
+    );
+
+    final column = tester.widget<SongColumnWidget>(
+      find.byType(SongColumnWidget),
+    );
+    final pager = tester.widget<PageView>(find.byType(PageView));
+    expect(column.isViewMode, isTrue);
+    expect(pager.controller?.viewportFraction, 0.96);
+  });
+
   testWidgets('board back clears remembered board and opens selector', (
     tester,
   ) async {
@@ -150,6 +172,8 @@ void main() {
 Future<void> _pumpBoardPage(
   WidgetTester tester, {
   List<Song> additionalSongs = const [],
+  bool canEdit = false,
+  UserPreferences preferences = const UserPreferences(),
 }) async {
   SharedPreferences.setMockInitialValues({});
   final boardChanges = StreamController<void>();
@@ -165,7 +189,7 @@ Future<void> _pumpBoardPage(
       id: 'board',
       ownerId: 'user',
       name: 'Set List',
-      canEdit: false,
+      canEdit: canEdit,
       columns: [
         SongColumn(
           id: 'favorites',
@@ -182,7 +206,7 @@ Future<void> _pumpBoardPage(
   );
   when(
     () => settingsRepository.load(preferRemote: any(named: 'preferRemote')),
-  ).thenAnswer((_) async => const UserPreferences());
+  ).thenAnswer((_) async => preferences);
 
   await tester.pumpWidget(
     ProviderScope(

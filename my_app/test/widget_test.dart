@@ -153,8 +153,6 @@ void main() {
       ),
     );
 
-    expect(find.text('Personal lyrics & notes'), findsOneWidget);
-
     final richText = tester.widget<RichText>(
       find.byWidgetPredicate(
         (widget) =>

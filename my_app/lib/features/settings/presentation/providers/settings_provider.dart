@@ -69,6 +69,25 @@ class SettingsController extends StateNotifier<AsyncValue<UserPreferences>> {
   Future<void> updateDarkMode(bool enabled) async {
     final previous = state.valueOrNull ?? const UserPreferences();
     final updated = previous.copyWith(darkMode: enabled);
+    await _persistWithRollback(previous, updated);
+  }
+
+  Future<void> updateViewMode(bool enabled) async {
+    final previous = state.valueOrNull ?? const UserPreferences();
+    final updated = previous.copyWith(viewMode: enabled);
+    await _persistWithRollback(previous, updated);
+  }
+
+  Future<void> updateWideSongColumns(bool enabled) async {
+    final previous = state.valueOrNull ?? const UserPreferences();
+    final updated = previous.copyWith(wideSongColumns: enabled);
+    await _persistWithRollback(previous, updated);
+  }
+
+  Future<void> _persistWithRollback(
+    UserPreferences previous,
+    UserPreferences updated,
+  ) async {
     state = AsyncValue.data(updated);
     try {
       await _repository.save(updated);

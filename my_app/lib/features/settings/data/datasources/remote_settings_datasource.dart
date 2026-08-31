@@ -24,7 +24,10 @@ class RemoteSettingsDataSource {
   Future<UserPreferencesModel?> fetch({String? userId}) async {
     final row = await _client
         .from(_table)
-        .select('lyrics_font_scale, dark_mode, updated_at')
+        .select(
+          'lyrics_font_scale, dark_mode, view_mode, '
+          'wide_song_columns, updated_at',
+        )
         .eq('user_id', userId ?? _currentUserId())
         .maybeSingle();
     if (row == null) return null;
@@ -42,6 +45,8 @@ class RemoteSettingsDataSource {
       'user_id': item.userId,
       'lyrics_font_scale': payload['lyrics_font_scale'],
       'dark_mode': payload['dark_mode'] as bool? ?? false,
+      'view_mode': payload['view_mode'] as bool? ?? false,
+      'wide_song_columns': payload['wide_song_columns'] as bool? ?? false,
       'updated_at': payload['updated_at'],
     }, onConflict: 'user_id');
   }
