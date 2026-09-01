@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_app/features/songs/presentation/pages/add_edit_song_page.dart';
+import 'package:my_app/shared/models/label.dart';
 import 'package:my_app/shared/models/song.dart';
 import 'package:my_app/shared/models/song_attachment.dart';
 
@@ -117,5 +118,46 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(savedSong?.artistName, 'New Artist');
+  });
+
+  testWidgets('plus button creates and selects label', (tester) async {
+    Song? savedSong;
+    const newLabel = Label(id: 'new-label', name: 'Worship');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AddEditSongPage(
+          availableArtists: const [],
+          onAddLabel: () async => newLabel,
+          onSave: (song) async => savedSong = song,
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Enter song title'),
+      'Song',
+    );
+    final addLabelButton = find.byTooltip('Add new label');
+    await tester.scrollUntilVisible(
+      addLabelButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(addLabelButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Worship'), findsOneWidget);
+    expect(
+      tester.getRect(find.text('LABELS')).left,
+      lessThan(tester.getRect(addLabelButton).left),
+    );
+    expect(
+      tester.getRect(find.text('Worship')).top,
+      greaterThan(tester.getRect(addLabelButton).bottom),
+    );
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(savedSong?.labels, ['new-label']);
   });
 }

@@ -26,7 +26,7 @@ class MenuBottomSheet extends ConsumerStatefulWidget {
   final VoidCallback onAddArtist;
   final Future<void> Function(String) onRemoveArtist;
   final ValueChanged<Artist> onUpdateArtist;
-  final ValueChanged<String> onAddLabel;
+  final VoidCallback onAddLabel;
   final ValueChanged<Label> onUpdateLabel;
   final Future<void> Function(String) onRemoveLabel;
   final VoidCallback? onExport;
@@ -292,7 +292,7 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
                             _buildAddButton(
                               label: 'Add Label',
                               icon: Icons.add_circle_outline,
-                              onPressed: () => widget.onAddLabel(''),
+                              onPressed: widget.onAddLabel,
                             ),
                           ],
                         ],

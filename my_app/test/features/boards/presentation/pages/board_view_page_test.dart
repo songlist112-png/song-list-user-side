@@ -13,6 +13,8 @@ import 'package:my_app/features/boards/presentation/widgets/song_column_widget.d
 import 'package:my_app/features/settings/domain/entities/user_preferences.dart';
 import 'package:my_app/features/settings/domain/repositories/settings_repository.dart';
 import 'package:my_app/features/settings/presentation/providers/settings_provider.dart';
+import 'package:my_app/features/songs/presentation/pages/add_edit_song_page.dart';
+import 'package:my_app/shared/models/label.dart';
 import 'package:my_app/shared/models/song.dart';
 import 'package:my_app/shared/models/song_column.dart';
 import 'package:my_app/shared/models/song_list.dart';
@@ -26,6 +28,7 @@ class _MockLastBoardStore extends Mock implements LastBoardStore {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  registerFallbackValue(const Song(id: 'fallback', title: 'Fallback'));
 
   testWidgets('glass confirms search and back arrow resets it', (tester) async {
     await _pumpBoardPage(tester);
@@ -168,6 +171,101 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('label dialog returns safely to Add Song editor', (tester) async {
+    final repository = await _pumpBoardPage(
+      tester,
+      canEdit: true,
+      stubLabelCreation: true,
+    );
+
+    await tester.tap(find.text('Add song'));
+    await tester.pumpAndSettle();
+    final addLabelButton = find.byTooltip('Add new label');
+    await tester.scrollUntilVisible(
+      addLabelButton,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(addLabelButton);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Label name'),
+      'Worship',
+    );
+    await tester.tap(find.text('Save Label'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Worship'), findsOneWidget);
+    verify(
+      () => repository.createLabel('board', 'Worship', Colors.blue),
+    ).called(1);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Enter song title'),
+      'Created Song',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final savedSong =
+        verify(
+              () => repository.createSong('favorites', captureAny(), 2),
+            ).captured.single
+            as Song;
+    expect(savedSong.labels, ['worship-label']);
+    expect(find.byType(AddEditSongPage), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(SongColumnWidget),
+        matching: find.text('Created Song'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('menu label creation waits for route teardown', (tester) async {
+    final repository = await _pumpBoardPage(
+      tester,
+      canEdit: true,
+      stubLabelCreation: true,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byIcon(Icons.more_vert),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final addLabelButton = find.text('Add Label');
+    await tester.scrollUntilVisible(
+      addLabelButton,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(addLabelButton);
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Label name'),
+      'Worship',
+    );
+    await tester.tap(find.text('Save Label'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repository.createLabel('board', 'Worship', Colors.blue),
+    ).called(1);
+    expect(find.text('Worship'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('uses persisted view mode and wide column preferences', (
     tester,
   ) async {
@@ -247,11 +345,12 @@ void main() {
   });
 }
 
-Future<void> _pumpBoardPage(
+Future<_MockBoardRepository> _pumpBoardPage(
   WidgetTester tester, {
   List<Song> additionalSongs = const [],
   List<SongColumn> additionalColumns = const [],
   bool canEdit = false,
+  bool stubLabelCreation = false,
   UserPreferences preferences = const UserPreferences(),
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -292,6 +391,19 @@ Future<void> _pumpBoardPage(
       createdAt: DateTime.utc(2026),
     ),
   );
+  if (stubLabelCreation) {
+    when(
+      () => boardRepository.createLabel('board', 'Worship', Colors.blue),
+    ).thenAnswer(
+      (_) async => const Label(id: 'worship-label', name: 'Worship'),
+    );
+    when(() => boardRepository.createSong('favorites', any(), 2)).thenAnswer((
+      invocation,
+    ) async {
+      final song = invocation.positionalArguments[1] as Song;
+      return song.copyWith(id: 'created-song');
+    });
+  }
   when(
     () => settingsRepository.load(preferRemote: any(named: 'preferRemote')),
   ).thenAnswer((_) async => preferences);
@@ -307,6 +419,7 @@ Future<void> _pumpBoardPage(
     ),
   );
   await tester.pumpAndSettle();
+  return boardRepository;
 }
 
 Future<void> _pumpRoutedBoardPage(

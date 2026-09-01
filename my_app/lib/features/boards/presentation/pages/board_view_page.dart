@@ -17,8 +17,8 @@ import '../../../songs/data/isar_personal_song_edit_repository.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../../songs/presentation/pages/personal_song_edit_page.dart';
 import '../../application/board_detail_controller.dart';
-import '../../data/last_board_store.dart';
 import '../../data/board_repository.dart';
+import '../../data/last_board_store.dart';
 import '../../domain/board_filter.dart';
 import '../../domain/song_reorder.dart';
 import '../providers/search_history_provider.dart';
@@ -413,6 +413,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           availableArtists: _songList.artists.map((a) => a.name).toList(),
           availableLabels: _songList.labels,
           onAddArtist: _addArtistFromSongEditor,
+          onAddLabel: _showAddLabelDialog,
           onDownloadAttachment: _repository.downloadAttachment,
           onSave: (song) async {
             final column = _songList.columns.firstWhere(
@@ -463,6 +464,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           availableArtists: allArtistNames,
           availableLabels: _songList.labels,
           onAddArtist: _addArtistFromSongEditor,
+          onAddLabel: _showAddLabelDialog,
           onDownloadAttachment: _repository.downloadAttachment,
           onSave: (updatedSong) async {
             final savedSong = await _repository.updateSong(updatedSong);
@@ -715,55 +717,70 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
-  void _showMenu() {
-    showModalBottomSheet(
+  Future<void> _showMenu() async {
+    var addLabelRequested = false;
+    Label? labelToEdit;
+    ModalRoute<dynamic>? menuRoute;
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true, // ADD THIS - keeps content away from status bar
       backgroundColor: _boardColors.surface,
-      builder: (_) => _applyBoardTheme(
-        MenuBottomSheet(
-          readOnly: !_songList.canEdit,
-          viewMode: _globalViewMode || !_songList.canEdit,
-          wideColumns: _globalWideSongColumns,
-          showArtist: _songList.showArtist,
-          showBpm: _songList.showBpm,
-          darkMode: _globalDarkMode,
-          artists: _songList.artists,
-          labels: _songList.labels,
-          onViewModeChanged: _setViewMode,
-          onWideColumnsChanged: _setWideSongColumns,
-          onShowArtistChanged: (val) =>
-              _saveBoard(_songList.copyWith(showArtist: val)),
-          onShowBpmChanged: (val) =>
-              _saveBoard(_songList.copyWith(showBpm: val)),
-          onDarkModeChanged: _changeGlobalDarkMode,
-          onAddArtist: _showArtistDialog,
-          onRemoveArtist: _removeArtist,
-          onUpdateArtist: _showArtistDialog,
-          onAddLabel: (name) {
-            _showAddLabelDialog();
-          },
-          onUpdateLabel: (label) {
-            _showAddLabelDialog(label);
-          },
-          onRemoveLabel: _removeLabel,
-          onExport: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Export feature coming soon')),
-            );
-          },
-          onImport: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Import feature coming soon')),
-            );
-          },
-        ),
-      ),
+      builder: (menuContext) {
+        menuRoute ??= ModalRoute.of(menuContext);
+        return _applyBoardTheme(
+          MenuBottomSheet(
+            readOnly: !_songList.canEdit,
+            viewMode: _globalViewMode || !_songList.canEdit,
+            wideColumns: _globalWideSongColumns,
+            showArtist: _songList.showArtist,
+            showBpm: _songList.showBpm,
+            darkMode: _globalDarkMode,
+            artists: _songList.artists,
+            labels: _songList.labels,
+            onViewModeChanged: _setViewMode,
+            onWideColumnsChanged: _setWideSongColumns,
+            onShowArtistChanged: (val) =>
+                _saveBoard(_songList.copyWith(showArtist: val)),
+            onShowBpmChanged: (val) =>
+                _saveBoard(_songList.copyWith(showBpm: val)),
+            onDarkModeChanged: _changeGlobalDarkMode,
+            onAddArtist: _showArtistDialog,
+            onRemoveArtist: _removeArtist,
+            onUpdateArtist: _showArtistDialog,
+            onAddLabel: () {
+              addLabelRequested = true;
+              Navigator.of(menuContext).pop();
+            },
+            onUpdateLabel: (label) {
+              labelToEdit = label;
+              Navigator.of(menuContext).pop();
+            },
+            onRemoveLabel: _removeLabel,
+            onExport: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Export feature coming soon')),
+              );
+            },
+            onImport: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Import feature coming soon')),
+              );
+            },
+          ),
+        );
+      },
     );
+
+    if (!addLabelRequested && labelToEdit == null) return;
+    await menuRoute?.completed;
+    if (!mounted) return;
+    await _showAddLabelDialog(existingLabel: labelToEdit);
+    if (mounted) unawaited(_showMenu());
   }
 
   Future<void> _showArtistDialog([Artist? existing]) async {
@@ -830,15 +847,15 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
-  void _showAddLabelDialog([Label? existingLabel]) {
-    Navigator.pop(context); // Close menu first
-
+  Future<Label?> _showAddLabelDialog({Label? existingLabel}) async {
     final controller = TextEditingController(text: existingLabel?.name);
     Color selectedColor = existingLabel?.color ?? Colors.blue;
+    ModalRoute<dynamic>? dialogRoute;
 
-    showDialog(
+    final result = await showDialog<Label>(
       context: context,
       builder: (dialogContext) {
+        dialogRoute ??= ModalRoute.of(dialogContext);
         return _applyBoardTheme(
           StatefulBuilder(
             builder: (context, setDialogState) {
@@ -1001,7 +1018,6 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                             child: OutlinedButton(
                               onPressed: () {
                                 Navigator.pop(dialogContext);
-                                _showMenu();
                               },
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
@@ -1051,28 +1067,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                                   if (!mounted || !dialogContext.mounted) {
                                     return;
                                   }
-                                  setState(() {
-                                    final labels = existingLabel == null
-                                        ? [..._songList.labels, label]
-                                        : _songList.labels
-                                              .map(
-                                                (item) => item.id == label.id
-                                                    ? label
-                                                    : item,
-                                              )
-                                              .toList();
-                                    _songList = _songList.copyWith(
-                                      labels: labels,
-                                    );
-                                  });
-                                  Navigator.pop(dialogContext);
-                                  if (existingLabel == null) {
-                                    AppSnackbar.showSuccess(
-                                      context,
-                                      'Label created',
-                                    );
-                                  }
-                                  _showMenu();
+                                  Navigator.pop(dialogContext, label);
                                 } on Exception catch (error) {
                                   if (mounted) _showError(error);
                                 }
@@ -1094,6 +1089,22 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         );
       },
     );
+    await dialogRoute?.completed;
+    controller.dispose();
+    if (result != null && mounted) {
+      setState(() {
+        final labels = existingLabel == null
+            ? [..._songList.labels, result]
+            : _songList.labels
+                  .map((item) => item.id == result.id ? result : item)
+                  .toList();
+        _songList = _songList.copyWith(labels: labels);
+      });
+      if (existingLabel == null) {
+        AppSnackbar.showSuccess(context, 'Label created');
+      }
+    }
+    return result;
   }
 
   void _showColumnMenu(SongColumn column) {
