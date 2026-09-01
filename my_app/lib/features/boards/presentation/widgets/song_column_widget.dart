@@ -19,6 +19,8 @@ class SongColumnWidget extends StatefulWidget {
   final Function(int, int)? onReorderSongs;
   final List<Label> availableLabels;
   final double? width;
+  final Set<String>? expandedSongIds;
+  final ValueChanged<String>? onSongExpansionToggle;
 
   const SongColumnWidget({
     super.key,
@@ -35,7 +37,12 @@ class SongColumnWidget extends StatefulWidget {
     this.onReorderSongs,
     this.availableLabels = const [],
     this.width,
-  });
+    this.expandedSongIds,
+    this.onSongExpansionToggle,
+  }) : assert(
+         (expandedSongIds == null) == (onSongExpansionToggle == null),
+         'Expanded song IDs and their toggle callback must be provided together.',
+       );
 
   @override
   State<SongColumnWidget> createState() => _SongColumnWidgetState();
@@ -44,7 +51,16 @@ class SongColumnWidget extends StatefulWidget {
 class _SongColumnWidgetState extends State<SongColumnWidget> {
   final Set<String> _expandedSongIds = {};
 
+  Set<String> get _effectiveExpandedSongIds =>
+      widget.expandedSongIds ?? _expandedSongIds;
+
   void _toggleSongExpansion(String songId) {
+    final onSongExpansionToggle = widget.onSongExpansionToggle;
+    if (onSongExpansionToggle != null) {
+      onSongExpansionToggle(songId);
+      return;
+    }
+
     setState(() {
       if (_expandedSongIds.contains(songId)) {
         _expandedSongIds.remove(songId);
@@ -115,7 +131,9 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                 child: !canReorder
                     ? Column(
                         children: widget.column.songs.map((song) {
-                          final isExpanded = _expandedSongIds.contains(song.id);
+                          final isExpanded = _effectiveExpandedSongIds.contains(
+                            song.id,
+                          );
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 6),
                             child: SongCardWidget(
@@ -187,7 +205,9 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                         ) {
                           final index = entry.key;
                           final song = entry.value;
-                          final isExpanded = _expandedSongIds.contains(song.id);
+                          final isExpanded = _effectiveExpandedSongIds.contains(
+                            song.id,
+                          );
 
                           return Padding(
                             key: ValueKey(song.id),

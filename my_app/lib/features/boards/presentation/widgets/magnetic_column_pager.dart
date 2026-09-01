@@ -6,6 +6,7 @@ class MagneticColumnPager extends StatefulWidget {
     required this.itemCount,
     required this.itemBuilder,
     this.initialPage = 0,
+    this.requestedPage,
     this.onPageChanged,
     this.viewportFraction = normalViewportFraction,
     this.trailing,
@@ -18,6 +19,7 @@ class MagneticColumnPager extends StatefulWidget {
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final int initialPage;
+  final int? requestedPage;
   final ValueChanged<int>? onPageChanged;
   final double viewportFraction;
   final Widget? trailing;
@@ -44,11 +46,16 @@ class _MagneticColumnPagerState extends State<MagneticColumnPager> {
   void didUpdateWidget(covariant MagneticColumnPager oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.viewportFraction != oldWidget.viewportFraction) {
-      _replaceController();
+      _replaceController(preferredPage: widget.requestedPage);
+      return;
     }
     final oldPageCount =
         oldWidget.itemCount + (oldWidget.trailing == null ? 0 : 1);
     if (_pageCount < oldPageCount) _keepCurrentPageInRange();
+    if (widget.requestedPage != null &&
+        widget.requestedPage != oldWidget.requestedPage) {
+      _moveToRequestedPage();
+    }
   }
 
   PageController _createController({int initialPage = 0}) => PageController(
@@ -56,17 +63,29 @@ class _MagneticColumnPagerState extends State<MagneticColumnPager> {
     viewportFraction: widget.viewportFraction,
   );
 
-  void _replaceController() {
+  void _replaceController({int? preferredPage}) {
     final previousController = _controller;
     final currentPage = previousController.hasClients
         ? (previousController.page ?? previousController.initialPage).round()
         : previousController.initialPage;
     final lastPage = _pageCount > 0 ? _pageCount - 1 : 0;
     _controller = _createController(
-      initialPage: currentPage.clamp(0, lastPage),
+      initialPage: (preferredPage ?? currentPage).clamp(0, lastPage),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       previousController.dispose();
+    });
+  }
+
+  void _moveToRequestedPage() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients || _pageCount == 0) return;
+      final targetPage = widget.requestedPage!.clamp(0, _pageCount - 1);
+      _controller.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
     });
   }
 

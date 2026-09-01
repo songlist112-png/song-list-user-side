@@ -32,7 +32,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       }
     });
     // Uncomment to block screenshots and screen recordings on Android and iOS.
-    // unawaited(ScreenCaptureProtection.acquire());
+    unawaited(ScreenCaptureProtection.acquire());
   }
 
   @override

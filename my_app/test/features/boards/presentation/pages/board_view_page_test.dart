@@ -64,6 +64,73 @@ void main() {
     );
   });
 
+  testWidgets('expanded lyrics stay open across different searches', (
+    tester,
+  ) async {
+    await _pumpBoardPage(tester);
+
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'Amazing');
+    await tester.pump();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SongColumnWidget),
+        matching: find.text('Amazing Grace'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Amazing lyrics'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Way');
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byType(SongColumnWidget),
+        matching: find.text('Amazing Grace'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Amazing lyrics'), findsOneWidget);
+    final wayMakerSong = find.descendant(
+      of: find.byType(SongColumnWidget),
+      matching: find.text('Way Maker'),
+    );
+    expect(wayMakerSong, findsOneWidget);
+
+    await tester.tap(wayMakerSong);
+    await tester.pumpAndSettle();
+    expect(find.text('Way lyrics'), findsOneWidget);
+  });
+
+  testWidgets('search centers the column containing the matched song', (
+    tester,
+  ) async {
+    await _pumpBoardPage(
+      tester,
+      additionalColumns: const [
+        SongColumn(
+          id: 'worship',
+          title: 'Worship',
+          songs: [Song(id: 'build-my-life', title: 'Build My Life')],
+        ),
+      ],
+    );
+
+    await tester.tap(find.text('Amazing Grace'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'Build My Life');
+    await tester.pumpAndSettle();
+
+    final controller = tester
+        .widget<PageView>(find.byType(PageView))
+        .controller!;
+    expect(controller.page, 1);
+    expect(find.text('Build My Life'), findsWidgets);
+  });
+
   testWidgets('search suggestions scroll above keyboard without overflow', (
     tester,
   ) async {
@@ -83,10 +150,21 @@ void main() {
     await tester.tap(find.byTooltip('Search'));
     tester.view.viewInsets = const FakeViewPadding(bottom: 320);
     await tester.pump();
+    final columnTopBeforeSuggestions = tester
+        .getTopLeft(find.byType(SongColumnWidget))
+        .dy;
     await tester.enterText(find.byType(TextField), 'History');
     await tester.pump(const Duration(milliseconds: 301));
 
+    expect(
+      find.byKey(const ValueKey('search-suggestions-card')),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(ListTile, 'History song 0'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byType(SongColumnWidget)).dy,
+      columnTopBeforeSuggestions,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -172,6 +250,7 @@ void main() {
 Future<void> _pumpBoardPage(
   WidgetTester tester, {
   List<Song> additionalSongs = const [],
+  List<SongColumn> additionalColumns = const [],
   bool canEdit = false,
   UserPreferences preferences = const UserPreferences(),
 }) async {
@@ -195,11 +274,20 @@ Future<void> _pumpBoardPage(
           id: 'favorites',
           title: 'Favorites',
           songs: <Song>[
-            const Song(id: 'amazing-grace', title: 'Amazing Grace'),
-            const Song(id: 'way-maker', title: 'Way Maker'),
+            const Song(
+              id: 'amazing-grace',
+              title: 'Amazing Grace',
+              lyrics: 'Amazing lyrics',
+            ),
+            const Song(
+              id: 'way-maker',
+              title: 'Way Maker',
+              lyrics: 'Way lyrics',
+            ),
             ...additionalSongs,
           ],
         ),
+        ...additionalColumns,
       ],
       createdAt: DateTime.utc(2026),
     ),

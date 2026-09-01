@@ -77,6 +77,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         column.songs,
         key: _activeKey,
         accidental: _activeAccidental,
+        retainedSongIds: _expandedSongIds,
       ),
     );
     return SongColumnWidget(
@@ -85,6 +86,8 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
       showArtist: _songList.showArtist,
       showBpm: _songList.showBpm,
       isViewMode: !canMutate,
+      expandedSongIds: _expandedSongIds,
+      onSongExpansionToggle: _toggleSongExpansion,
       availableLabels: _songList.labels,
       onAddSong: () => _addSongToColumn(filteredColumn.id),
       onMenuTap: () => _showColumnMenu(filteredColumn),
@@ -109,6 +112,16 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   String? _activeAccidental;
 
   // View mode state
+  final Set<String> _expandedSongIds = <String>{};
+
+  void _toggleSongExpansion(String songId) {
+    setState(() {
+      if (!_expandedSongIds.add(songId)) {
+        _expandedSongIds.remove(songId);
+      }
+    });
+  }
+
   // Search state
   bool _isSearchMode = false;
   final TextEditingController _searchController = TextEditingController();
@@ -304,41 +317,55 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   }
 
   Widget _buildSearchSuggestions(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Material(
-      color: colors.surface,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
-          ),
+      key: const ValueKey('search-suggestions-card'),
+      color: const Color(0xE61A2233),
+      elevation: 10,
+      shadowColor: Colors.black54,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: _searchSuggestions.length,
+        separatorBuilder: (_, _) => Divider(
+          height: 1,
+          color: Colors.white.withValues(alpha: 0.12),
+          indent: 16,
+          endIndent: 16,
         ),
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const ClampingScrollPhysics(),
-          itemCount: _searchSuggestions.length,
-          separatorBuilder: (_, _) => Divider(
-            height: 1,
-            color: colors.outline.withValues(alpha: 0.3),
-            indent: 16,
-            endIndent: 16,
-          ),
-          itemBuilder: (context, index) {
-            final suggestion = _searchSuggestions[index];
-            return ListTile(
-              leading: Icon(
-                Icons.search,
-                size: 18,
-                color: colors.onSurfaceVariant,
-              ),
-              title: Text(
-                suggestion,
-                style: TextStyle(fontSize: 15, color: colors.onSurface),
-              ),
-              onTap: () => _onSuggestionSelected(suggestion),
-            );
-          },
+        itemBuilder: (context, index) {
+          final suggestion = _searchSuggestions[index];
+          return ListTile(
+            dense: true,
+            leading: const Icon(
+              Icons.history_rounded,
+              size: 18,
+              color: Colors.white70,
+            ),
+            title: Text(
+              suggestion,
+              style: const TextStyle(fontSize: 15, color: Colors.white),
+            ),
+            onTap: () => _onSuggestionSelected(suggestion),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchSuggestionsOverlay(BuildContext context) {
+    return Positioned(
+      top: 8,
+      left: 12,
+      right: 12,
+      bottom: 8,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 280),
+          child: _buildSearchSuggestions(context),
         ),
       ),
     );
@@ -1187,7 +1214,15 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     final filteredColumns = BoardFilter.columns(
       _songList.columns,
       query: _searchQuery,
+      retainedSongIds: _expandedSongIds,
     );
+    final matchingColumnId = BoardFilter.firstMatchingColumnId(
+      _songList.columns,
+      query: _searchQuery,
+    );
+    final matchingColumnIndex = matchingColumnId == null
+        ? null
+        : filteredColumns.indexWhere((column) => column.id == matchingColumnId);
     final hasFilters =
         _activeKey != null ||
         _activeAccidental != null ||
@@ -1265,143 +1300,144 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                     //   ),
                   ],
           ),
-          body: Column(
+          body: Stack(
             children: [
-              // Search suggestions overlay
-              if (_isSearchMode && _searchSuggestions.isNotEmpty)
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: _buildSearchSuggestions(context),
-                ),
+              Column(
+                children: [
+                  // Key filter bar - hide when search has no results
+                  if (filteredColumns.isNotEmpty)
+                    KeyFilterBar(
+                      activeKey: _activeKey,
+                      activeAccidental: _activeAccidental,
+                      onKeySelected: (key) {
+                        setState(() => _activeKey = key);
+                      },
+                      onAccidentalSelected: (acc) {
+                        setState(() => _activeAccidental = acc);
+                      },
+                      onClear: () {
+                        setState(() {
+                          _activeKey = null;
+                          _activeAccidental = null;
+                        });
+                      },
+                    ),
 
-              // Key filter bar - hide when search has no results
-              if (filteredColumns.isNotEmpty)
-                KeyFilterBar(
-                  activeKey: _activeKey,
-                  activeAccidental: _activeAccidental,
-                  onKeySelected: (key) {
-                    setState(() => _activeKey = key);
-                  },
-                  onAccidentalSelected: (acc) {
-                    setState(() => _activeAccidental = acc);
-                  },
-                  onClear: () {
-                    setState(() {
-                      _activeKey = null;
-                      _activeAccidental = null;
-                    });
-                  },
-                ),
-
-              // Columns (horizontal scrolling)
-              Expanded(
-                child: filteredColumns.isEmpty
-                    ? _searchQuery.isNotEmpty
-                          // Search returned no results
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.search_off,
-                                    size: 64,
-                                    color: Colors.white.withValues(alpha: 0.55),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'No results found',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Try a different search term',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.7,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          // Board is empty
-                          : Center(
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.view_column_outlined,
-                                      size: 64,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.55,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'No song lists yet',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Create your first song list to get started.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 14,
+                  // Columns (horizontal scrolling)
+                  Expanded(
+                    child: filteredColumns.isEmpty
+                        ? _searchQuery.isNotEmpty
+                              // Search returned no results
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.search_off,
+                                        size: 64,
                                         color: Colors.white.withValues(
-                                          alpha: 0.7,
+                                          alpha: 0.55,
                                         ),
                                       ),
-                                    ),
-
-                                    if (canMutate) ...[
-                                      const SizedBox(height: 24),
-                                      ElevatedButton.icon(
-                                        onPressed: _addColumn,
-                                        icon: const Icon(Icons.add),
-                                        label: const Text('Create Song List'),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'No results found',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Try a different search term',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
                                       ),
                                     ],
-                                  ],
-                                ),
+                                  ),
+                                )
+                              // Board is empty
+                              : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.view_column_outlined,
+                                        size: 64,
+                                        color: Colors.white.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'No song lists yet',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Create your first song list to get started.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
+                                      ),
+                                      if (canMutate) ...[
+                                        const SizedBox(height: 24),
+                                        ElevatedButton.icon(
+                                          onPressed: _addColumn,
+                                          icon: const Icon(Icons.add),
+                                          label: const Text('Create Song List'),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                )
+                        // Board has columns
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 16),
+                            child: MagneticColumnPager(
+                              initialPage: _initialColumnIndex,
+                              requestedPage: matchingColumnIndex == -1
+                                  ? null
+                                  : matchingColumnIndex,
+                              viewportFraction: preferences.wideSongColumns
+                                  ? MagneticColumnPager.wideViewportFraction
+                                  : MagneticColumnPager.normalViewportFraction,
+                              itemCount: filteredColumns.length,
+                              itemBuilder: (_, index) => _buildColumnPage(
+                                filteredColumns[index],
+                                canMutate: canMutate,
+                                canReorder: canReorder,
                               ),
-                            )
-                    // Board has columns
-                    : Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 16),
-                        child: MagneticColumnPager(
-                          initialPage: _initialColumnIndex,
-                          viewportFraction: preferences.wideSongColumns
-                              ? MagneticColumnPager.wideViewportFraction
-                              : MagneticColumnPager.normalViewportFraction,
-                          itemCount: filteredColumns.length,
-                          itemBuilder: (_, index) => _buildColumnPage(
-                            filteredColumns[index],
-                            canMutate: canMutate,
-                            canReorder: canReorder,
+                              onPageChanged: hasFilters
+                                  ? null
+                                  : (index) {
+                                      if (index < _songList.columns.length) {
+                                        unawaited(_rememberColumnIndex(index));
+                                      }
+                                    },
+                              trailing: canMutate
+                                  ? AddColumnButton(onTap: _addColumn)
+                                  : null,
+                            ),
                           ),
-                          onPageChanged: hasFilters
-                              ? null
-                              : (index) {
-                                  if (index < _songList.columns.length) {
-                                    unawaited(_rememberColumnIndex(index));
-                                  }
-                                },
-                          trailing: canMutate
-                              ? AddColumnButton(onTap: _addColumn)
-                              : null,
-                        ),
-                      ),
+                  ),
+                ],
               ),
+              if (_isSearchMode && _searchSuggestions.isNotEmpty)
+                _buildSearchSuggestionsOverlay(context),
             ],
           ),
         ),
