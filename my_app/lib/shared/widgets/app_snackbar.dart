@@ -34,11 +34,12 @@ class _SnackbarContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFBFBFA),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        color: colors.surface,
+        border: Border.all(color: colors.outline),
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
           BoxShadow(
@@ -54,7 +55,7 @@ class _SnackbarContent extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFFEDF3EC),
+              color: const Color(0xFF346538).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(6),
             ),
             child: const Icon(
@@ -67,8 +68,8 @@ class _SnackbarContent extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                color: Color(0xFF2F3437),
+              style: TextStyle(
+                color: colors.onSurface,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.35,
@@ -80,7 +81,7 @@ class _SnackbarContent extends StatelessWidget {
             onPressed: () =>
                 ScaffoldMessenger.of(context).hideCurrentSnackBar(),
             icon: const Icon(Icons.close_rounded, size: 18),
-            color: const Color(0xFF787774),
+            color: colors.onSurfaceVariant,
             tooltip: 'Dismiss notification',
             visualDensity: VisualDensity.compact,
           ),

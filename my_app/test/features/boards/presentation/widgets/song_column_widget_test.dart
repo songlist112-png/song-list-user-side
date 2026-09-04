@@ -11,7 +11,8 @@ import 'package:my_app/shared/models/song_column.dart';
 
 class _InMemorySettingsRepository implements SettingsRepository {
   @override
-  Future<UserPreferences> load() async => const UserPreferences();
+  Future<UserPreferences> load({bool preferRemote = false}) async =>
+      const UserPreferences();
 
   @override
   Future<void> save(UserPreferences preferences) async {}
@@ -39,9 +40,7 @@ void main() {
                 column: SongColumn(
                   id: 'column',
                   title: 'Set list',
-                  songs: [
-                    Song(id: 'song', title: 'Long song', lyrics: lyrics),
-                  ],
+                  songs: [Song(id: 'song', title: 'Long song', lyrics: lyrics)],
                 ),
                 isViewMode: true,
               ),

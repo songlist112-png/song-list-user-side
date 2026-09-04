@@ -4,6 +4,8 @@ part 'subscription.g.dart';
 
 @collection
 class Subscription {
+  static const defaultTrialLimitSeconds = 14 * 24 * 60 * 60;
+
   Id id = Isar.autoIncrement;
 
   @Index(unique: true)
@@ -20,7 +22,7 @@ class Subscription {
   DateTime? expiresAt;
 
   /// Trial configuration.
-  int trialLimitSeconds = 10800;
+  int trialLimitSeconds = defaultTrialLimitSeconds;
 
   /// Locally tracked trial usage.
   int trialUsedSeconds = 0;

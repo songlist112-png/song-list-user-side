@@ -41,7 +41,9 @@ class SettingsSyncCoordinator {
     final remote = await _remote.fetch(userId: userId);
     if (remote == null) return;
     final local = await _local.read();
-    if (local != null && local.lyricsFontScale == remote.lyricsFontScale) {
+    if (local != null &&
+        local.lyricsFontScale == remote.lyricsFontScale &&
+        local.darkMode == remote.darkMode) {
       return;
     }
     await _local.write(remote);

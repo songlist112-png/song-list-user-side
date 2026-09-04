@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -24,9 +22,11 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 
 /// Holds the loaded preferences and propagates updates to storage.
 final settingsProvider =
-    StateNotifierProvider<SettingsController, AsyncValue<UserPreferences>>(
-      (ref) => SettingsController(ref.watch(settingsRepositoryProvider)),
-    );
+    StateNotifierProvider<SettingsController, AsyncValue<UserPreferences>>((
+      ref,
+    ) {
+      return SettingsController(ref.watch(settingsRepositoryProvider));
+    });
 
 class SettingsController extends StateNotifier<AsyncValue<UserPreferences>> {
   SettingsController(this._repository) : super(const AsyncValue.loading()) {
@@ -34,14 +34,21 @@ class SettingsController extends StateNotifier<AsyncValue<UserPreferences>> {
   }
 
   final SettingsRepository _repository;
+  int _loadRevision = 0;
 
-  Future<void> _load() async {
+  Future<void> _load({bool preferRemote = false}) async {
+    final revision = ++_loadRevision;
     try {
-      state = AsyncValue.data(await _repository.load());
+      final preferences = await _repository.load(preferRemote: preferRemote);
+      if (revision == _loadRevision) state = AsyncValue.data(preferences);
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      if (revision == _loadRevision) {
+        state = AsyncValue.error(error, stackTrace);
+      }
     }
   }
+
+  Future<void> reloadFromRemote() => _load(preferRemote: true);
 
   /// Applies the lyrics zoom multiplier locally and persists it.
   ///
@@ -57,5 +64,17 @@ class SettingsController extends StateNotifier<AsyncValue<UserPreferences>> {
     final updated = current.copyWith(lyricsFontScale: clamped);
     state = AsyncValue.data(updated);
     await _repository.save(updated);
+  }
+
+  Future<void> updateDarkMode(bool enabled) async {
+    final previous = state.valueOrNull ?? const UserPreferences();
+    final updated = previous.copyWith(darkMode: enabled);
+    state = AsyncValue.data(updated);
+    try {
+      await _repository.save(updated);
+    } catch (_) {
+      state = AsyncValue.data(previous);
+      rethrow;
+    }
   }
 }

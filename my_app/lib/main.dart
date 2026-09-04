@@ -6,11 +6,13 @@ import 'package:my_app/database/isar_database.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
+import 'app/router/app_router.dart';
 import 'core/constants/env.dart';
 import 'core/services/background_sync.dart';
 import 'core/services/sync_service.dart';
 import 'core/widgets/configuration_error_app.dart';
 import 'core/widgets/startup_error_app.dart';
+import 'features/boards/data/last_board_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,10 +41,25 @@ Future<void> main() async {
   }
 
   final syncService = SyncService(isar: IsarDatabase.instance);
+  String? lastBoardId;
+  try {
+    lastBoardId = await LastBoardStore().read();
+  } on Exception catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'last board restoration',
+      ),
+    );
+  }
+  final router = createAppRouter(
+    initialLocation: restoredBoardLocation(lastBoardId),
+  );
   runApp(
     ProviderScope(
       overrides: [syncServiceProvider.overrideWithValue(syncService)],
-      child: const MyApp(),
+      child: MyApp(router: router),
     ),
   );
 

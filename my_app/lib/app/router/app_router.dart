@@ -2,7 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/boards/presentation/pages/board_selector_page.dart';
-import '../../features/boards/presentation/pages/board_view_page.dart';
+import '../../features/boards/presentation/pages/board_route_page.dart';
 import '../../features/legal/presentation/pages/legal_policy_page.dart';
 import '../../features/support/presentation/pages/create_ticket_page.dart';
 import '../../features/support/presentation/pages/help_feedback_page.dart';
@@ -11,8 +11,8 @@ import '../../features/support/presentation/pages/ticket_details_page.dart';
 import '../../features/subscription/presentation/widgets/subscription_gate.dart';
 import '../../features/sync/presentation/widgets/initial_sync_gate.dart';
 
-final appRouter = GoRouter(
-  initialLocation: '/',
+GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
+  initialLocation: initialLocation,
   redirect: (context, state) {
     final session = Supabase.instance.client.auth.currentSession;
     final location = state.matchedLocation;
@@ -57,7 +57,11 @@ final appRouter = GoRouter(
           path: '/board/:id',
           builder: (context, state) {
             final boardId = state.pathParameters['id']!;
-            return BoardViewPage(boardId: boardId);
+            return BoardRoutePage(
+              boardId: boardId,
+              restoredFromPreviousSession:
+                  state.uri.queryParameters['restored'] == 'true',
+            );
           },
         ),
       ],
@@ -85,3 +89,12 @@ final appRouter = GoRouter(
     ),
   ],
 );
+
+String restoredBoardLocation(String? boardId) {
+  final normalizedBoardId = boardId?.trim();
+  if (normalizedBoardId == null || normalizedBoardId.isEmpty) return '/';
+  return Uri(
+    pathSegments: ['', 'board', normalizedBoardId],
+    queryParameters: const {'restored': 'true'},
+  ).toString();
+}

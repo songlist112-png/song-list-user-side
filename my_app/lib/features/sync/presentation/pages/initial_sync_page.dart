@@ -75,11 +75,12 @@ class _SetupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final progress = (status.progress ?? 0).clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(32),
         boxShadow: const [
           BoxShadow(
@@ -97,8 +98,8 @@ class _SetupCard extends StatelessWidget {
           Text(
             _title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF0A1E3A),
+            style: TextStyle(
+              color: colors.onSurface,
               fontSize: 27,
               height: 1.15,
               fontWeight: FontWeight.w800,
@@ -109,8 +110,8 @@ class _SetupCard extends StatelessWidget {
           Text(
             _description,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF607089),
+            style: TextStyle(
+              color: colors.onSurfaceVariant,
               fontSize: 14,
               height: 1.5,
             ),
@@ -163,6 +164,7 @@ class _ProgressPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Semantics(
       label: 'Initial song synchronization',
       value: '${status.progressPercent} percent',
@@ -170,9 +172,9 @@ class _ProgressPanel extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F7FC),
+          color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFDDE8F6)),
+          border: Border.all(color: colors.outline),
         ),
         child: Column(
           children: [
@@ -213,8 +215,8 @@ class _ProgressPanel extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 _countLabel,
-                style: const TextStyle(
-                  color: Color(0xFF607089),
+                style: TextStyle(
+                  color: colors.onSurfaceVariant,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -247,8 +249,8 @@ class _ProgressPanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     _statusLabel,
-                    style: const TextStyle(
-                      color: Color(0xFF33445D),
+                    style: TextStyle(
+                      color: colors.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -285,36 +287,39 @@ class _BrandMark extends StatelessWidget {
   const _BrandMark();
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0758B8),
-          borderRadius: BorderRadius.circular(15),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0758B8),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: const Icon(Icons.queue_music_rounded, color: Colors.white),
         ),
-        child: const Icon(Icons.queue_music_rounded, color: Colors.white),
-      ),
-      const SizedBox(width: 12),
-      const Flexible(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            'Song List',
-            maxLines: 1,
-            style: TextStyle(
-              color: Color(0xFF0A1E3A),
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
+        const SizedBox(width: 12),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Song List',
+              maxLines: 1,
+              style: TextStyle(
+                color: colors.onSurface,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
             ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class _GlowOrb extends StatelessWidget {

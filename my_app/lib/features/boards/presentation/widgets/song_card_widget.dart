@@ -41,6 +41,7 @@ class SongCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final statusLabel = song.hasPersonalEdit
         ? 'Edited'
         : song.creatorType == SongCreatorType.admin
@@ -79,7 +80,7 @@ class SongCardWidget extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppColors.bgCard,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(10),
           boxShadow: AppColors.shadowCard,
         ),
@@ -96,10 +97,10 @@ class SongCardWidget extends StatelessWidget {
                     song.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.text,
+                      color: colors.onSurface,
                     ),
                   ),
                 ),
@@ -107,10 +108,10 @@ class SongCardWidget extends StatelessWidget {
                   IconButton(
                     tooltip: 'Move song',
                     onPressed: onMove,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.drive_file_move_outlined,
                       size: 20,
-                      color: AppColors.textMuted,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 if (onPersonalEdit != null)
@@ -147,9 +148,9 @@ class SongCardWidget extends StatelessWidget {
                     Expanded(
                       child: Text.rich(
                         TextSpan(
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textMuted,
+                            color: colors.onSurfaceVariant,
                           ),
                           children: _joinMeta(metaItems),
                         ),
@@ -259,9 +260,9 @@ class _MetaDot extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 3,
     height: 3,
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: AppColors.border,
+      color: Theme.of(context).colorScheme.outline,
     ),
   );
 }
@@ -273,17 +274,18 @@ class _AttachmentCount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.attach_file, size: 13, color: AppColors.textMuted),
+        Icon(Icons.attach_file, size: 13, color: colors.onSurfaceVariant),
         const SizedBox(width: 3),
         Text(
           '$count',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: AppColors.textMuted,
+            color: colors.onSurfaceVariant,
           ),
         ),
       ],
@@ -329,40 +331,40 @@ class _LyricsSectionState extends ConsumerState<_LyricsSection> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final song = widget.song;
     final hasPersonalEdit = song.hasPersonalEdit;
     final preferences = ref.watch(settingsProvider).valueOrNull;
     final scale =
-        preferences?.lyricsFontScale ??
-        UserPreferences.defaultLyricsFontScale;
+        preferences?.lyricsFontScale ?? UserPreferences.defaultLyricsFontScale;
     final fontSize = _baseSize * scale;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 12),
-        const Divider(color: AppColors.border, height: 1),
+        Divider(color: colors.outline, height: 1),
         const SizedBox(height: 12),
         Row(
           children: [
-            Icon(
-              Icons.lyrics,
-              size: 14,
-              color: hasPersonalEdit
-                  ? AppColors.personalEdit
-                  : AppColors.textMuted,
-            ),
+            // Icon(
+            //   Icons.lyrics,
+            //   size: 14,
+            //   color: hasPersonalEdit
+            //       ? AppColors.personalEdit
+            //       : colors.onSurfaceVariant,
+            // ),
             const SizedBox(width: 6),
-            Text(
-              hasPersonalEdit ? 'Personal lyrics & notes' : 'Lyrics',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: hasPersonalEdit
-                    ? AppColors.personalEdit
-                    : AppColors.textMuted,
-              ),
-            ),
+            // Text(
+            //   hasPersonalEdit ? 'Personal lyrics & notes' : 'Lyrics',
+            //   style: TextStyle(
+            //     fontSize: 12,
+            //     fontWeight: FontWeight.w600,R
+            //     color: hasPersonalEdit
+            //         ? AppColors.personalEdit
+            //         : colors.onSurfaceVariant,
+            //   ),
+            // ),
             const Spacer(),
             if (widget.isViewMode)
               TextZoomControl(
@@ -399,10 +401,10 @@ class _DragHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const icon = Icon(
+    final icon = Icon(
       Icons.drag_indicator,
       size: 20,
-      color: AppColors.textMuted,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
     final index = reorderIndex;
     return Padding(
@@ -411,7 +413,7 @@ class _DragHandle extends StatelessWidget {
           ? icon
           : ReorderableDragStartListener(
               index: index,
-              child: const SizedBox(
+              child: SizedBox(
                 width: 40,
                 height: 40,
                 child: Center(child: icon),

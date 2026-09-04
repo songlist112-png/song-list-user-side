@@ -23,6 +23,8 @@ import '../../shared/models/song_attachment.dart';
 import '../../shared/models/song_list.dart';
 import 'board_sync_cache.dart';
 import 'song_arrangement_confirmation.dart';
+import 'sync_queue_authorization_policy.dart';
+import 'sync_queue_batch_processor.dart';
 
 final syncServiceProvider = Provider<SyncService>(
   (_) => throw StateError('SyncService provider was not initialized'),
@@ -195,10 +197,9 @@ class SyncService {
         return;
       }
 
-      var pending = await _discardUnauthorizedReorders(
-        userId,
-        await _pendingFor(userId),
-      );
+      await _discardUnauthorizedMutations(userId);
+      await _recoverFalseNegativeArrangements(userId);
+      var pending = await _pendingFor(userId);
       // Capture watermark before reads so changes racing this pull remain
       // strictly newer and are collected by the next incremental sync.
       final serverWatermark = await _remote.serverTime();
@@ -227,7 +228,11 @@ class SyncService {
       if (pending.isNotEmpty) {
         pending = await _discardConfirmedArrangements(pending);
         final applied = await _applyPending(pending);
-        await _confirmAppliedArrangements(applied);
+        // Arrangement RPCs are atomic and raise when validation, ownership, or
+        // persistence fails. A second read is not a safe acknowledgement: it
+        // can observe a superseding rapid edit and reject an upload that
+        // already committed successfully.
+        await _deleteQueueItems(applied.map((item) => item.id).toSet());
         await _supportSync.pull(userId);
         await _settingsSync.pull(userId);
         await _mergePersonalSongEdits(
@@ -551,61 +556,28 @@ class SyncService {
   }
 
   Future<List<SyncQueue>> _applyPending(List<SyncQueue> pending) async {
-    final applied = <SyncQueue>[];
-    for (final item in pending) {
-      final nextAttempt = item.nextAttemptAt;
-      if (nextAttempt != null && nextAttempt.isAfter(DateTime.now().toUtc())) {
-        _scheduleRetry(nextAttempt);
-        continue;
-      }
-      try {
-        if (_supportSync.handles(item)) {
-          await _supportSync.apply(item);
-        } else if (_settingsSync.handles(item)) {
-          await _settingsSync.apply(item);
-        } else {
-          await _remote.apply(item);
-        }
-        applied.add(item);
-      } catch (error, stackTrace) {
+    return SyncQueueBatchProcessor.process(
+      items: pending,
+      apply: _applyPendingItem,
+      onDeferred: _scheduleRetry,
+      onFailure: (item, error, stackTrace) async {
         debugPrint(
           'Sync upload failed for ${item.entityType}/${item.entityId}: $error',
         );
         debugPrintStack(stackTrace: stackTrace);
         await _recordRetry(item, error);
-        rethrow;
-      }
-    }
-    return applied;
+      },
+    );
   }
 
-  Future<void> _confirmAppliedArrangements(List<SyncQueue> applied) async {
-    final confirmation = SongArrangementConfirmation.from(applied);
-    final orders = await _remote.fetchOwnedSongOrders(confirmation.columnIds);
-    final rejectedIds = confirmation.rejectedQueueIdsForOrders(orders);
-    final confirmedIds = applied
-        .where((item) => !rejectedIds.contains(item.id))
-        .map((item) => item.id)
-        .toSet();
-    await _deleteQueueItems(confirmedIds);
-    final rejected = await _currentPending(rejectedIds);
-    if (rejected.isEmpty) return;
-    for (final item in rejected) {
-      await _recordRetry(
-        item,
-        StateError('Server did not confirm song arrangement'),
-      );
+  Future<void> _applyPendingItem(SyncQueue item) async {
+    if (_supportSync.handles(item)) {
+      await _supportSync.apply(item);
+    } else if (_settingsSync.handles(item)) {
+      await _settingsSync.apply(item);
+    } else {
+      await _remote.apply(item);
     }
-    throw StateError('Server did not confirm song arrangement');
-  }
-
-  Future<List<SyncQueue>> _currentPending(Set<int> ids) async {
-    final result = <SyncQueue>[];
-    for (final id in ids) {
-      final item = await _isar.syncQueues.get(id);
-      if (item != null && item.status == 'pending') result.add(item);
-    }
-    return result;
   }
 
   Future<List<SyncQueue>> _pendingFor(String userId) async {
@@ -619,44 +591,51 @@ class SyncService {
     return items;
   }
 
-  Future<List<SyncQueue>> _discardUnauthorizedReorders(
-    String userId,
-    List<SyncQueue> pending,
-  ) async {
-    final reorderItems = pending
-        .where((item) => item.operation == 'reorder')
-        .toList();
-    if (reorderItems.isEmpty) return pending;
-
+  Future<void> _discardUnauthorizedMutations(String userId) async {
+    final items = await _isar.syncQueues
+        .filter()
+        .userIdEqualTo(userId)
+        .findAll();
+    if (items.isEmpty) return;
     final rows = await _isar.cachedBoards
         .filter()
         .accountIdEqualTo(userId)
         .findAll();
-    final reorderableColumns = <String, bool>{};
-    for (final row in rows) {
-      final board = BoardCodec.decode(row.document);
-      for (final column in board.columns) {
-        reorderableColumns[column.id] = column.songs.every(
-          (song) => song.canEdit,
-        );
-      }
-    }
-
-    final unauthorized = reorderItems
-        .where((item) => reorderableColumns[item.entityId] == false)
-        .toList();
-    if (unauthorized.isEmpty) return pending;
-
+    final policy = SyncQueueAuthorizationPolicy(
+      userId: userId,
+      boards: rows.map((row) => BoardCodec.decode(row.document)).toList(),
+    );
+    final unauthorized = items.where(policy.rejects).toList();
+    if (unauthorized.isEmpty) return;
     await _isar.writeTxn(
       () => _isar.syncQueues.deleteAll(
         unauthorized.map((item) => item.id).toList(),
       ),
     );
     debugPrint(
-      'Discarded ${unauthorized.length} unauthorized admin-song reorder(s)',
+      'Discarded ${unauthorized.length} unauthorized sync mutation(s)',
     );
-    final unauthorizedIds = unauthorized.map((item) => item.id).toSet();
-    return pending.where((item) => !unauthorizedIds.contains(item.id)).toList();
+  }
+
+  Future<void> _recoverFalseNegativeArrangements(String userId) async {
+    final failed = await _isar.syncQueues
+        .filter()
+        .userIdEqualTo(userId)
+        .and()
+        .statusEqualTo('failed')
+        .findAll();
+    final recoverable = failed
+        .where(SongArrangementConfirmation.shouldRecover)
+        .toList(growable: false);
+    if (recoverable.isEmpty) return;
+    for (final item in recoverable) {
+      item
+        ..status = 'pending'
+        ..attempts = 0
+        ..nextAttemptAt = null
+        ..lastError = null;
+    }
+    await _isar.writeTxn(() => _isar.syncQueues.putAll(recoverable));
   }
 
   Future<void> _ensureAuthProfile(User user) async {

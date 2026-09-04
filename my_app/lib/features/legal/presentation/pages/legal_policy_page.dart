@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../app/theme/app_colors.dart';
-
 class LegalSection {
   final String title;
   final String body;
@@ -24,6 +22,7 @@ class LegalPolicyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: _backgroundBottom,
       body: DecoratedBox(
@@ -62,9 +61,9 @@ class LegalPolicyPage extends StatelessWidget {
               ),
               Expanded(
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(24),
                     ),
                   ),
@@ -115,24 +114,25 @@ class _SectionBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '${index.toString().padLeft(2, '0')}. ${section.title}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            color: AppColors.text,
+            color: colors.onSurface,
             letterSpacing: -0.2,
           ),
         ),
         const SizedBox(height: 7),
         Text(
           section.body,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13.5,
-            color: AppColors.textMuted,
+            color: colors.onSurfaceVariant,
             height: 1.55,
           ),
         ),

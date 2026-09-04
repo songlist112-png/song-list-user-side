@@ -70,6 +70,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: _backgroundBottom,
       body: LayoutBuilder(
@@ -133,9 +134,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   right: 0,
                   bottom: 0,
                   child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(38),
                       ),
                     ),
@@ -248,9 +249,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           Text.rich(
                             textAlign: TextAlign.center,
                             TextSpan(
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF6B7280),
+                                color: colors.onSurfaceVariant,
                                 height: 1.5,
                               ),
                               children: [

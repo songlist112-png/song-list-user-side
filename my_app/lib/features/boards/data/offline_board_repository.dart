@@ -135,6 +135,7 @@ class OfflineBoardRepository implements BoardRepository {
   @override
   Future<void> deleteBoard(String id) async {
     final row = await _findBoardRow(id);
+    _requireOwnedBoard(BoardCodec.decode(row.document));
     await _isar.writeTxn(() async {
       await _isar.cachedBoards.delete(row.id);
       await _putQueue('boards', id, 'delete', const {});
@@ -524,7 +525,9 @@ class OfflineBoardRepository implements BoardRepository {
     required Map<String, dynamic> payload,
   }) async {
     final row = await _findBoardRow(boardId);
-    final board = transform(BoardCodec.decode(row.document));
+    final current = BoardCodec.decode(row.document);
+    _requireOwnedBoard(current);
+    final board = transform(current);
     row
       ..document = BoardCodec.encode(board)
       ..updatedAt = DateTime.now().toUtc();
@@ -542,6 +545,7 @@ class OfflineBoardRepository implements BoardRepository {
     required Map<String, dynamic> payload,
   }) async {
     final accountId = _requiredUserId;
+    _requireOwnedBoard(board);
     final existing = await _isar.cachedBoards
         .filter()
         .cacheKeyEqualTo('$accountId:${board.id}')
@@ -559,6 +563,12 @@ class OfflineBoardRepository implements BoardRepository {
       await _putQueue(entityType, entityId, operation, payload);
     });
     onSyncNeeded?.call();
+  }
+
+  void _requireOwnedBoard(SongList board) {
+    if (board.ownerId != _requiredUserId || !board.canEdit) {
+      throw StateError('Only the board owner can change this board');
+    }
   }
 
   Future<void> _putQueue(

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:my_app/app/theme/app_colors.dart';
+import 'package:my_app/app/theme/app_theme.dart';
 import 'package:my_app/core/services/sync_service.dart';
 import 'package:my_app/database/local/models/profile.dart';
 import 'package:my_app/features/boards/data/board_repository.dart';
@@ -85,6 +87,33 @@ void main() {
       },
     );
   }
+
+  testWidgets('dark theme covers board selector and create dialog', (
+    tester,
+  ) async {
+    final changes = StreamController<void>();
+    addTearDown(changes.close);
+    final repository = _stubRepository(changes, const []);
+
+    await _pumpSelector(tester, repository, theme: AppTheme.darkTheme);
+
+    final surfaceContainers = tester
+        .widgetList<Container>(find.byType(Container))
+        .map((widget) => (widget.decoration as BoxDecoration?)?.color);
+    expect(surfaceContainers, contains(AppColors.bgCardDark));
+
+    await tester.tap(find.byTooltip('Create a new song list'));
+    await tester.pumpAndSettle();
+
+    expect(
+      Theme.of(tester.element(find.byType(AlertDialog))).brightness,
+      Brightness.dark,
+    );
+    expect(
+      Theme.of(tester.element(find.byType(TextField))).colorScheme.surface,
+      AppColors.bgCardDark,
+    );
+  });
 }
 
 Future<void> _exerciseBoardCrud(WidgetTester tester) async {
@@ -147,6 +176,7 @@ Future<void> _pumpSelector(
   Stream<SyncStatus>? syncStatuses,
   bool settle = true,
   bool openMyBoards = true,
+  ThemeData? theme,
 }) async {
   final profile = Profile()
     ..userId = 'user'
@@ -169,7 +199,7 @@ Future<void> _pumpSelector(
               ),
         ),
       ],
-      child: const MaterialApp(home: BoardSelectorPage()),
+      child: MaterialApp(theme: theme, home: const BoardSelectorPage()),
     ),
   );
   if (settle) {
@@ -179,7 +209,7 @@ Future<void> _pumpSelector(
     await tester.pump();
   }
   if (openMyBoards) {
-    await tester.tap(find.text('My Boards'));
+    await tester.tap(find.text('My Song Lists'));
     await tester.pumpAndSettle();
   }
 }

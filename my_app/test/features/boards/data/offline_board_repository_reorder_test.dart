@@ -71,6 +71,31 @@ void main() {
   );
 
   test(
+    'reorders up and back down repeatedly with final order queued',
+    () async {
+      final repository = _repository(isar);
+
+      for (var cycle = 0; cycle < 5; cycle++) {
+        final up = (await repository.fetchBoard('board')).columns.first.songs;
+        await repository.reorderSongs([up[2], up[0], up[1]]);
+        final down = (await repository.fetchBoard('board')).columns.first.songs;
+        await repository.reorderSongs([down[1], down[2], down[0]]);
+      }
+
+      final restored = await repository.fetchBoard('board');
+      expect(restored.columns.first.songs.map((song) => song.id), [
+        'one',
+        'two',
+        'three',
+      ]);
+      final queue = await isar.syncQueues.where().findAll();
+      expect(queue, hasLength(1));
+      final payload = jsonDecode(queue.single.payload!) as Map<String, dynamic>;
+      expect(payload['ids'], ['one', 'two', 'three']);
+    },
+  );
+
+  test(
     'moves a personal song between columns and queues atomic move',
     () async {
       var syncRequests = 0;
@@ -127,6 +152,29 @@ void main() {
     },
   );
 
+  test('moves one song repeatedly through every column and back', () async {
+    final repository = _repository(isar);
+
+    for (var cycle = 0; cycle < 3; cycle++) {
+      await repository.moveSong('one', 'column-two');
+      await repository.moveSong('one', 'column-three');
+      await repository.moveSong('one', 'column');
+    }
+
+    final restored = await repository.fetchBoard('board');
+    expect(restored.columns[0].songs.map((song) => song.id), [
+      'two',
+      'three',
+      'one',
+    ]);
+    expect(restored.columns[1].songs, isEmpty);
+    expect(restored.columns[2].songs, isEmpty);
+
+    final queue = await isar.syncQueues.where().findAll();
+    expect(queue, hasLength(9));
+    expect(queue.every((item) => item.operation == 'move'), isTrue);
+  });
+
   test('personal lyrics overlay never mutates cached admin song', () async {
     final row = (await isar.cachedBoards.where().findAll()).single;
     final board = BoardCodec.decode(row.document);
@@ -168,6 +216,33 @@ void main() {
     );
     expect(cached.columns.first.songs.first.lyrics, 'Admin lyrics');
     expect(cached.columns.first.songs.first.hasPersonalEdit, isFalse);
+  });
+
+  test('stale edit flags cannot queue changes for another owner', () async {
+    final row = (await isar.cachedBoards.where().findAll()).single;
+    final board = BoardCodec.decode(
+      row.document,
+    ).copyWith(ownerId: 'other-user');
+    row
+      ..ownerId = 'other-user'
+      ..document = BoardCodec.encode(board);
+    await isar.writeTxn(() => isar.cachedBoards.put(row));
+    final repository = _repository(isar);
+
+    await expectLater(
+      repository.updateBoard(board.copyWith(showArtist: false)),
+      throwsStateError,
+    );
+    await expectLater(
+      repository.reorderSongs(board.columns.first.songs.reversed.toList()),
+      throwsStateError,
+    );
+    await expectLater(
+      repository.moveSong('one', 'column-two'),
+      throwsStateError,
+    );
+
+    expect(await isar.syncQueues.where().findAll(), isEmpty);
   });
 }
 
@@ -226,6 +301,7 @@ Future<void> _seedBoard(Isar isar) async {
         ],
       ),
       SongColumn(id: 'column-two', title: 'Encore'),
+      SongColumn(id: 'column-three', title: 'Finale'),
     ],
   );
   final row = CachedBoard()

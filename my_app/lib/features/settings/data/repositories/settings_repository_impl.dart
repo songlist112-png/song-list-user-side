@@ -12,10 +12,9 @@ import '../models/user_preferences_model.dart';
 
 /// Offline-first settings store.
 ///
-/// The local copy is the source of truth. Every save writes locally and enqueues
-/// a `user_preferences` sync operation, which the background [SyncService]
-/// flushes to Supabase (with retry/backoff) once connectivity allows. Loading
-/// reads local first and only falls back to the server when nothing is cached.
+/// Every save writes locally and enqueues a `user_preferences` sync operation,
+/// which the background [SyncService] flushes to Supabase (with retry/backoff).
+/// Normal loads use the cache; authenticated refreshes reconcile from Supabase.
 class SettingsRepositoryImpl implements SettingsRepository {
   SettingsRepositoryImpl({
     required Isar isar,
@@ -44,17 +43,33 @@ class SettingsRepositoryImpl implements SettingsRepository {
       _userId() ?? (throw StateError('Authentication required'));
 
   @override
-  Future<UserPreferences> load() async {
+  Future<UserPreferences> load({bool preferRemote = false}) async {
     final cached = await _local.read();
-    if (cached != null) return cached.toEntity();
+    if (cached != null && !preferRemote) return cached.toEntity();
+
+    if (_userId() == null) {
+      return cached?.toEntity() ?? const UserPreferences();
+    }
 
     UserPreferencesModel? remote;
+    var remoteReadSucceeded = false;
     try {
       remote = await _remote.fetch();
+      remoteReadSucceeded = true;
     } catch (error) {
       debugPrint('Could not load remote preferences: $error');
     }
-    final preferences = remote?.toEntity() ?? const UserPreferences();
+    if (!remoteReadSucceeded) {
+      final fallback = cached?.toEntity() ?? const UserPreferences();
+      if (cached == null && !preferRemote) {
+        await _local.write(UserPreferencesModel.fromEntity(fallback));
+      }
+      return fallback;
+    }
+    final preferences =
+        remote?.toEntity() ??
+        (preferRemote ? const UserPreferences() : cached?.toEntity()) ??
+        const UserPreferences();
     await _local.write(UserPreferencesModel.fromEntity(preferences));
     return preferences;
   }
@@ -68,6 +83,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
     final now = DateTime.now().toUtc();
     final payload = <String, Object?>{
       'lyrics_font_scale': model.lyricsFontScale,
+      'dark_mode': model.darkMode,
       'updated_at': now.toIso8601String(),
     };
     await _isar.writeTxn(() async {

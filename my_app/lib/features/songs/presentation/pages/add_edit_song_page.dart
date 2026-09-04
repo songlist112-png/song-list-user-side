@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -11,13 +12,17 @@ import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_attachment.dart';
 import '../../../../shared/utils/media_type.dart';
 
+enum _AttachmentAction { view, download, remove }
+
 class AddEditSongPage extends StatefulWidget {
   final Song? existingSong;
   final List<String> availableArtists;
   final List<Label> availableLabels;
   final Future<void> Function(Song) onSave;
   final Future<void> Function()? onDelete;
+  final Future<String?> Function()? onAddArtist;
   final Future<Uint8List> Function(SongAttachment)? onDownloadAttachment;
+  final Future<void> Function(String path, String mediaType)? onOpenAttachment;
 
   const AddEditSongPage({
     super.key,
@@ -26,7 +31,9 @@ class AddEditSongPage extends StatefulWidget {
     this.availableLabels = const [],
     required this.onSave,
     this.onDelete,
+    this.onAddArtist,
     this.onDownloadAttachment,
+    this.onOpenAttachment,
   });
 
   @override
@@ -34,14 +41,18 @@ class AddEditSongPage extends StatefulWidget {
 }
 
 class _AddEditSongPageState extends State<AddEditSongPage> {
+  ColorScheme get _colors => Theme.of(context).colorScheme;
+
   late final TextEditingController _titleController;
   late final TextEditingController _tempoController;
   late final TextEditingController _lyricsController;
   String? _selectedArtist;
+  late final List<String> _availableArtists;
   String? _selectedKey;
   String _selectedKeyType = 'Major';
   List<SongAttachment> _attachments = [];
   List<String> _selectedLabelIds = [];
+  bool _isAddingArtist = false;
   static const List<String> _keys = [
     '(none)',
     "C",
@@ -77,6 +88,11 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       text: widget.existingSong?.lyrics ?? '',
     );
     _selectedArtist = widget.existingSong?.artistName;
+    _availableArtists = [...widget.availableArtists];
+    if (_selectedArtist case final artist?
+        when !_availableArtists.contains(artist)) {
+      _availableArtists.add(artist);
+    }
     _selectedKey = widget.existingSong?.key;
     _selectedKeyType = widget.existingSong?.keyType ?? 'Major';
     _attachments = List<SongAttachment>.from(
@@ -136,10 +152,30 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     }
   }
 
-  void _showError(Object error) {
+  Future<void> _handleAddArtist() async {
+    final addArtist = widget.onAddArtist;
+    if (addArtist == null || _isAddingArtist) return;
+    setState(() => _isAddingArtist = true);
+    try {
+      final artist = await addArtist();
+      if (!mounted || artist == null) return;
+      setState(() {
+        if (!_availableArtists.contains(artist)) {
+          _availableArtists.add(artist);
+        }
+        _selectedArtist = artist;
+      });
+    } on Exception catch (error) {
+      if (mounted) _showError(error, action: 'create artist');
+    } finally {
+      if (mounted) setState(() => _isAddingArtist = false);
+    }
+  }
+
+  void _showError(Object error, {String action = 'save song'}) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Could not save song: $error')));
+    ).showSnackBar(SnackBar(content: Text('Could not $action: $error')));
   }
 
   @override
@@ -147,21 +183,21 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     final isEditing = widget.existingSong != null;
 
     return Scaffold(
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: _colors.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        foregroundColor: AppColors.text,
+        foregroundColor: _colors.onSurface,
         elevation: 0,
         title: Text(
           isEditing ? 'Edit Song' : 'New Song',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: AppColors.text,
+            color: _colors.onSurface,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.text, size: 24),
+          icon: Icon(Icons.close, color: _colors.onSurface, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -217,13 +253,14 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
+                          key: ValueKey(_selectedArtist),
                           initialValue: _selectedArtist,
                           decoration: const InputDecoration(
                             contentPadding: EdgeInsets.symmetric(
@@ -233,15 +270,15 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             border: InputBorder.none,
                             hintText: 'Select artist',
                           ),
-                          dropdownColor: AppColors.bgCard,
-                          items: widget.availableArtists.map((a) {
+                          dropdownColor: _colors.surface,
+                          items: _availableArtists.map((a) {
                             return DropdownMenuItem(
                               value: a,
                               child: Text(
                                 a,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                 ),
                               ),
                             );
@@ -252,27 +289,33 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                         ),
                       ),
                     ),
-                    // const SizedBox(width: 10),
-                    // Container(
-                    //   height: 48,
-                    //   width: 48,
-                    //   decoration: BoxDecoration(
-                    //     color: AppColors.accent.withValues(alpha: 0.1),
-                    //     borderRadius: BorderRadius.circular(12),
-                    //     border: Border.all(
-                    //       color: AppColors.accent.withValues(alpha: 0.3),
-                    //     ),
-                    //   ),
-                    //   child: IconButton(
-                    //     onPressed: _showAddArtistDialog,
-                    //     icon: const Icon(
-                    //       Icons.add,
-                    //       size: 20,
-                    //       color: AppColors.accent,
-                    //     ),
-                    //     tooltip: 'Add new artist',
-                    //   ),
-                    // ),
+                    if (widget.onAddArtist != null) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        height: 48,
+                        width: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: IconButton(
+                          onPressed: _isAddingArtist ? null : _handleAddArtist,
+                          icon: _isAddingArtist
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.add, size: 20),
+                          color: AppColors.accent,
+                          tooltip: 'Add new artist',
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -307,10 +350,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                       flex: 2,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
@@ -322,15 +365,15 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             ),
                             border: InputBorder.none,
                           ),
-                          dropdownColor: AppColors.bgCard,
+                          dropdownColor: _colors.surface,
                           items: _keys.map((k) {
                             return DropdownMenuItem(
                               value: k,
                               child: Text(
                                 k,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                 ),
                               ),
                             );
@@ -346,10 +389,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                       flex: 3,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
@@ -361,15 +404,15 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             ),
                             border: InputBorder.none,
                           ),
-                          dropdownColor: AppColors.bgCard,
+                          dropdownColor: _colors.surface,
                           items: _keyTypes.map((t) {
                             return DropdownMenuItem(
                               value: t,
                               child: Text(
                                 t,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                 ),
                               ),
                             );
@@ -395,18 +438,20 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.bgColumn.withValues(alpha: 0.5),
+                      color: _colors.surfaceContainerHighest.withValues(
+                        alpha: 0.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.3),
+                        color: _colors.outline.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(
                           Icons.info_outline,
                           size: 18,
-                          color: AppColors.textMuted,
+                          color: _colors.onSurfaceVariant,
                         ),
                         SizedBox(width: 8),
                         Expanded(
@@ -414,7 +459,7 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             'No labels available. Add labels in the menu.',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.textMuted,
+                              color: _colors.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -448,12 +493,12 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? label.color.withValues(alpha: 0.15)
-                                  : AppColors.bgCard,
+                                  : _colors.surface,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: isSelected
                                     ? label.color
-                                    : AppColors.border.withValues(alpha: 0.5),
+                                    : _colors.outline.withValues(alpha: 0.5),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -486,8 +531,8 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: isSelected
-                                        ? AppColors.text
-                                        : AppColors.textMuted,
+                                        ? _colors.onSurface
+                                        : _colors.onSurfaceVariant,
                                     fontWeight: isSelected
                                         ? FontWeight.w600
                                         : FontWeight.w500,
@@ -511,24 +556,24 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.bgCard,
+                    color: _colors.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.border.withValues(alpha: 0.5),
+                      color: _colors.outline.withValues(alpha: 0.5),
                     ),
                   ),
                   child: TextField(
                     controller: _lyricsController,
                     maxLines: 6,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      color: AppColors.text,
+                      color: _colors.onSurface,
                       height: 1.5,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Enter lyrics or notes...',
                       hintStyle: TextStyle(
-                        color: AppColors.textMuted,
+                        color: _colors.onSurfaceVariant,
                         fontSize: 15,
                       ),
                       contentPadding: EdgeInsets.all(16),
@@ -616,10 +661,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
+                          color: _colors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.5),
+                            color: _colors.outline.withValues(alpha: 0.5),
                           ),
                         ),
                         child: Row(
@@ -636,49 +681,30 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
                             Expanded(
                               child: Text(
                                 fileName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  color: AppColors.text,
+                                  color: _colors.onSurface,
                                   fontWeight: FontWeight.w500,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // Download button for all files when editing
-                            if (isEditing) ...[
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.download,
-                                  size: 20,
-                                  color: AppColors.accent,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 36,
-                                  minHeight: 36,
-                                ),
-                                tooltip: 'Download file',
-                                onPressed:
-                                    attachment.storagePath == null ||
-                                        widget.onDownloadAttachment == null
-                                    ? null
-                                    : () => _downloadAttachment(attachment),
-                              ),
-                              const SizedBox(width: 4),
-                            ],
                             IconButton(
-                              icon: const Icon(
-                                Icons.close,
-                                size: 20,
-                                color: AppColors.textMuted,
-                              ),
+                              icon: const Icon(Icons.more_vert, size: 20),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
                                 minWidth: 36,
                                 minHeight: 36,
                               ),
-                              tooltip: 'Remove',
-                              onPressed: () => _removeAttachment(index),
+                              tooltip: 'Attachment actions',
+                              onPressed: () => _showAttachmentActions(
+                                attachment,
+                                index,
+                                canDownload:
+                                    isEditing &&
+                                    attachment.storagePath != null &&
+                                    widget.onDownloadAttachment != null,
+                              ),
                             ),
                           ],
                         ),
@@ -705,10 +731,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.textMuted,
+              color: _colors.onSurfaceVariant,
               letterSpacing: 0.5,
             ),
           ),
@@ -732,18 +758,18 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.bgCard,
+            color: _colors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            border: Border.all(color: _colors.outline.withValues(alpha: 0.5)),
           ),
           child: TextField(
             controller: controller,
             keyboardType: keyboardType,
-            style: const TextStyle(fontSize: 15, color: AppColors.text),
+            style: TextStyle(fontSize: 15, color: _colors.onSurface),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: const TextStyle(
-                color: AppColors.textMuted,
+              hintStyle: TextStyle(
+                color: _colors.onSurfaceVariant,
                 fontSize: 15,
               ),
               contentPadding: const EdgeInsets.symmetric(
@@ -763,10 +789,10 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       children: [
         Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.text,
+            color: _colors.onSurface,
           ),
         ),
         if (isRequired)
@@ -781,39 +807,6 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       ],
     );
   }
-
-  // void _showAddArtistDialog() {
-  //   final controller = TextEditingController();
-  //   showDialog(
-  //     context: context,
-  //     builder: (ctx) => AlertDialog(
-  //       title: const Text('Add Artist'),
-  //       content: TextField(
-  //         controller: controller,
-  //         autofocus: true,
-  //         decoration: const InputDecoration(hintText: 'Artist name'),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(ctx),
-  //           child: const Text('Cancel'),
-  //         ),
-  //         ElevatedButton(
-  //           onPressed: () {
-  //             final name = controller.text.trim();
-  //             if (name.isNotEmpty) {
-  //               setState(() {
-  //                 _selectedArtist = name;
-  //               });
-  //             }
-  //             Navigator.pop(ctx);
-  //           },
-  //           child: const Text('Add'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   Future<void> _pickFile() async {
     try {
@@ -853,6 +846,117 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     setState(() {
       _attachments.removeAt(index);
     });
+  }
+
+  bool _canViewAttachment(SongAttachment attachment) {
+    return attachment.localPath != null ||
+        (attachment.storagePath != null && widget.onDownloadAttachment != null);
+  }
+
+  Future<void> _showAttachmentActions(
+    SongAttachment attachment,
+    int index, {
+    required bool canDownload,
+  }) async {
+    final action = await showModalBottomSheet<_AttachmentAction>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: _colors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined),
+              title: const Text('View'),
+              enabled: _canViewAttachment(attachment),
+              onTap: _canViewAttachment(attachment)
+                  ? () => Navigator.pop(sheetContext, _AttachmentAction.view)
+                  : null,
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_outlined),
+              title: const Text('Download'),
+              enabled: canDownload,
+              onTap: canDownload
+                  ? () =>
+                        Navigator.pop(sheetContext, _AttachmentAction.download)
+                  : null,
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Remove', style: TextStyle(color: Colors.red)),
+              onTap: () =>
+                  Navigator.pop(sheetContext, _AttachmentAction.remove),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _AttachmentAction.view:
+        await _viewAttachment(attachment);
+      case _AttachmentAction.download:
+        await _downloadAttachment(attachment);
+      case _AttachmentAction.remove:
+        _removeAttachment(index);
+    }
+  }
+
+  Future<void> _viewAttachment(SongAttachment attachment) async {
+    try {
+      final openAttachment = widget.onOpenAttachment;
+      final localPath = attachment.localPath;
+      if (openAttachment != null && localPath != null) {
+        await openAttachment(localPath, attachment.fileType);
+        return;
+      }
+
+      final file = await _resolveAttachmentFile(attachment);
+      if (openAttachment != null) {
+        await openAttachment(file.path, attachment.fileType);
+        return;
+      }
+
+      final result = await OpenFilex.open(file.path, type: attachment.fileType);
+      if (result.type != ResultType.done) {
+        throw FileSystemException(result.message, file.path);
+      }
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open attachment: $error')),
+      );
+    }
+  }
+
+  Future<File> _resolveAttachmentFile(SongAttachment attachment) async {
+    final localPath = attachment.localPath;
+    if (localPath != null) {
+      final localFile = File(localPath);
+      if (await localFile.exists()) return localFile;
+    }
+
+    final downloadAttachment = widget.onDownloadAttachment;
+    if (attachment.storagePath == null || downloadAttachment == null) {
+      throw FileSystemException('Attachment file is unavailable', localPath);
+    }
+
+    final bytes = await downloadAttachment(attachment);
+    final directory = await getTemporaryDirectory();
+    final safeId = (attachment.id ?? 'attachment').replaceAll(
+      RegExp(r'[^a-zA-Z0-9_-]'),
+      '_',
+    );
+    final safeName = attachment.name.replaceAll(
+      RegExp(r'[^a-zA-Z0-9._-]'),
+      '_',
+    );
+    final file = File('${directory.path}/${safeId}_$safeName');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
   }
 
   Future<void> _downloadAttachment(SongAttachment attachment) async {

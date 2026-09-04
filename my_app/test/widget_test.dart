@@ -3,18 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_app/core/widgets/app_chip.dart';
 import 'package:my_app/app/theme/app_colors.dart';
+import 'package:my_app/app/theme/app_theme.dart';
 import 'package:my_app/features/boards/presentation/widgets/song_card_widget.dart';
+import 'package:my_app/features/boards/presentation/widgets/song_column_widget.dart';
 import 'package:my_app/features/settings/domain/entities/user_preferences.dart';
 import 'package:my_app/features/settings/domain/repositories/settings_repository.dart';
 import 'package:my_app/features/settings/presentation/providers/settings_provider.dart';
 import 'package:my_app/features/songs/presentation/widgets/protected_lyrics_text.dart';
 import 'package:my_app/shared/models/song.dart';
+import 'package:my_app/shared/models/song_column.dart';
 
 class _InMemorySettingsRepository implements SettingsRepository {
   UserPreferences preferences = const UserPreferences();
 
   @override
-  Future<UserPreferences> load() async => preferences;
+  Future<UserPreferences> load({bool preferRemote = false}) async =>
+      preferences;
 
   @override
   Future<void> save(UserPreferences newPreferences) async {
@@ -53,7 +57,9 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('song card shows edited status for user-created song', (tester) async {
+  testWidgets('song card shows edited status for user-created song', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -72,7 +78,9 @@ void main() {
     expect(find.text('Edited'), findsOneWidget);
   });
 
-  testWidgets('song card shows library status for admin-created song', (tester) async {
+  testWidgets('song card shows library status for admin-created song', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -89,6 +97,37 @@ void main() {
     );
 
     expect(find.text('Library'), findsOneWidget);
+  });
+
+  testWidgets('dark board theme recolors columns and cards only', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: const Scaffold(
+          body: SongColumnWidget(
+            column: SongColumn(
+              id: 'column',
+              title: 'Dark list',
+              songs: [Song(id: 'song', title: 'Dark card')],
+            ),
+            isViewMode: true,
+          ),
+        ),
+      ),
+    );
+
+    final containerColors = tester
+        .widgetList<Container>(find.byType(Container))
+        .map((widget) => (widget.decoration as BoxDecoration?)?.color);
+    expect(containerColors, contains(AppColors.bgColumnDark));
+    expect(containerColors, contains(AppColors.bgCardDark));
+    expect(AppTheme.darkTheme.scaffoldBackgroundColor, AppColors.bg);
+    expect(
+      Theme.of(tester.element(find.text('Dark card'))).brightness,
+      Brightness.dark,
+    );
   });
 
   testWidgets('only user lyric lines use green indicator', (tester) async {

@@ -65,6 +65,61 @@ void main() {
 
     expect(SongArrangementConfirmation.from([reorder]).matches(board), isTrue);
   });
+
+  test('tracks final order after repeated alternating arrangements', () {
+    final items = <SyncQueue>[];
+    for (var cycle = 0; cycle < 5; cycle++) {
+      items
+        ..add(
+          _queue(cycle * 2 + 1, 'column-a', 'reorder', {
+            'column_id': 'column-a',
+            'ids': ['song-2', 'song-1'],
+          }),
+        )
+        ..add(
+          _queue(cycle * 2 + 2, 'column-a', 'reorder', {
+            'column_id': 'column-a',
+            'ids': ['song-1', 'song-2'],
+          }),
+        );
+    }
+
+    final confirmation = SongArrangementConfirmation.from(items);
+
+    expect(
+      confirmation.matchesOrders({
+        'column-a': ['song-1', 'song-2'],
+      }),
+      isTrue,
+    );
+    expect(confirmation.queueIds, hasLength(10));
+  });
+
+  test('recovers only arrangements failed by retired confirmation read', () {
+    final reorder =
+        _queue(1, 'column-a', 'reorder', const {
+            'column_id': 'column-a',
+            'ids': ['song-1'],
+          })
+          ..status = 'failed'
+          ..lastError =
+              'Bad state: ${SongArrangementConfirmation.retiredConfirmationError}';
+    final unrelated =
+        _queue(2, 'column-a', 'reorder', const {
+            'column_id': 'column-a',
+            'ids': ['song-1'],
+          })
+          ..status = 'failed'
+          ..lastError = 'PostgrestException: Forbidden';
+    final pending = _queue(3, 'column-a', 'reorder', const {
+      'column_id': 'column-a',
+      'ids': ['song-1'],
+    });
+
+    expect(SongArrangementConfirmation.shouldRecover(reorder), isTrue);
+    expect(SongArrangementConfirmation.shouldRecover(unrelated), isFalse);
+    expect(SongArrangementConfirmation.shouldRecover(pending), isFalse);
+  });
 }
 
 SyncQueue _queue(

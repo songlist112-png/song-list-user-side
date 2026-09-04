@@ -11,12 +11,18 @@ class AppColors {
   // Column background (light gray)
   static const Color bgColumn = Color(0xFFF1F2F4);
 
+  // Dark-mode surfaces. Blue brand colors intentionally stay unchanged.
+  static const Color bgColumnDark = Color(0xFF282E33);
+
   // Card background
   static const Color bgCard = Color(0xFFFFFFFF);
+  static const Color bgCardDark = Color(0xFF1D2125);
 
   // Text colors
   static const Color text = Color(0xFF172B4D);
   static const Color textMuted = Color(0xFF44546F);
+  static const Color textDark = Color(0xFFF1F2F4);
+  static const Color textMutedDark = Color(0xFFB6C2CF);
 
   // Accent / primary action blue
   static const Color accent = Color(0xFF0C66E4);
@@ -26,6 +32,7 @@ class AppColors {
 
   // Border
   static const Color border = Color(0xFFDCDFE4);
+  static const Color borderDark = Color(0xFF454F59);
 
   // Card hover
   static const Color cardHoverBg = Color(0xFFF8F9FA);

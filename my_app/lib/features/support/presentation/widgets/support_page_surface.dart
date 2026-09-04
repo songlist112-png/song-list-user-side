@@ -8,20 +8,23 @@ class SupportPageSurface extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.bgDark,
-    child: Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF3F7FC),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: child,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: AppColors.bgDark,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: child,
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

@@ -6,14 +6,18 @@ Future<String?> showNamePrompt(
   String initialValue = '',
   String label = 'Name',
   String actionLabel = 'Save',
+  ThemeData? theme,
 }) {
   return showDialog<String>(
     context: context,
-    builder: (_) => _NamePromptDialog(
-      title: title,
-      initialValue: initialValue,
-      label: label,
-      actionLabel: actionLabel,
+    builder: (_) => Theme(
+      data: theme ?? Theme.of(context),
+      child: _NamePromptDialog(
+        title: title,
+        initialValue: initialValue,
+        label: label,
+        actionLabel: actionLabel,
+      ),
     ),
   );
 }

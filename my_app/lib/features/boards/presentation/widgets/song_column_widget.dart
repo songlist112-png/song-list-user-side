@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/models/label.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_column.dart';
@@ -19,6 +18,7 @@ class SongColumnWidget extends StatefulWidget {
   final Function(String)? onRenameColumn;
   final Function(int, int)? onReorderSongs;
   final List<Label> availableLabels;
+  final double? width;
 
   const SongColumnWidget({
     super.key,
@@ -34,6 +34,7 @@ class SongColumnWidget extends StatefulWidget {
     this.onRenameColumn,
     this.onReorderSongs,
     this.availableLabels = const [],
+    this.width,
   });
 
   @override
@@ -55,9 +56,10 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     // Use almost full screen width with small padding (16px on each side)
-    final columnWidth = screenWidth - 32;
+    final columnWidth = widget.width ?? screenWidth - 32;
     final canReorder =
         widget.onReorderSongs != null &&
         widget.column.songs.every((song) => song.canEdit);
@@ -68,7 +70,7 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
     return Container(
       width: columnWidth,
       decoration: BoxDecoration(
-        color: AppColors.bgColumn,
+        color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: SingleChildScrollView(
@@ -84,10 +86,10 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                   Expanded(
                     child: Text(
                       widget.column.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text,
+                        color: colors.onSurface,
                       ),
                     ),
                   ),
@@ -99,7 +101,7 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                         onPressed: widget.onMenuTap,
                         icon: const Icon(Icons.more_vert, size: 18),
                         padding: EdgeInsets.zero,
-                        color: AppColors.textMuted,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -233,14 +235,14 @@ class _SongColumnWidgetState extends State<SongColumnWidget> {
                     vertical: 10,
                   ),
                   child: Row(
-                    children: const [
-                      Icon(Icons.add, size: 18, color: AppColors.textMuted),
-                      SizedBox(width: 6),
+                    children: [
+                      Icon(Icons.add, size: 18, color: colors.onSurfaceVariant),
+                      const SizedBox(width: 6),
                       Text(
                         'Add song',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textMuted,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
                     ],
