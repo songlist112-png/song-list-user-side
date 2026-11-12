@@ -30,12 +30,16 @@ class AddColumnButton extends StatelessWidget {
             else
               const Icon(Icons.add, size: 18, color: Colors.white),
             const SizedBox(width: 8),
-            Text(
-              isLoading ? 'Adding set' : 'Add another set',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
+            Expanded(
+              child: Text(
+                isLoading ? 'Adding set' : 'Add another set',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],

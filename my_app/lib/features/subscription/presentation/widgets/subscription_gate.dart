@@ -37,9 +37,7 @@ class _SubscriptionGateState extends ConsumerState<SubscriptionGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(
-        ref.read(subscriptionGateProvider.notifier).validateIfNeeded(),
-      );
+      unawaited(ref.read(subscriptionGateProvider.notifier).validateIfNeeded());
     }
   }
 

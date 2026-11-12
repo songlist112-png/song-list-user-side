@@ -93,13 +93,23 @@ void main() {
       );
 
       await repository.save(
-        const UserPreferences(lyricsFontScale: 1.25, darkMode: true),
+        const UserPreferences(
+          lyricsFontScale: 1.25,
+          darkMode: true,
+          viewMode: true,
+          wideSongColumns: true,
+        ),
       );
 
       final loaded = await repository.load();
       expect(
         loaded,
-        const UserPreferences(lyricsFontScale: 1.25, darkMode: true),
+        const UserPreferences(
+          lyricsFontScale: 1.25,
+          darkMode: true,
+          viewMode: true,
+          wideSongColumns: true,
+        ),
       );
       verifyNever(() => remote.fetch(userId: any(named: 'userId')));
 
@@ -112,6 +122,8 @@ void main() {
       expect(item.userId, 'user');
       expect(jsonDecode(item.payload!)['lyrics_font_scale'], 1.25);
       expect(jsonDecode(item.payload!)['dark_mode'], isTrue);
+      expect(jsonDecode(item.payload!)['view_mode'], isTrue);
+      expect(jsonDecode(item.payload!)['wide_song_columns'], isTrue);
       expect(syncRequests, 1);
     },
   );

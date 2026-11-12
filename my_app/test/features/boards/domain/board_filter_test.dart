@@ -39,6 +39,30 @@ void main() {
     test('omits columns without matches', () {
       expect(BoardFilter.columns(columns, query: 'missing'), isEmpty);
     });
+
+    test('keeps expanded songs alongside current search matches', () {
+      final result = BoardFilter.columns(
+        columns,
+        query: 'oceans',
+        retainedSongIds: const {'1'},
+      );
+
+      expect(result.single.songs.map((song) => song.id), ['1', '2']);
+    });
+  });
+
+  group('BoardFilter.firstMatchingColumnId', () {
+    test('returns the first column containing the query match', () {
+      expect(BoardFilter.firstMatchingColumnId(columns, query: 'alive'), '2');
+    });
+
+    test('returns null for a blank or missing query', () {
+      expect(BoardFilter.firstMatchingColumnId(columns, query: ' '), isNull);
+      expect(
+        BoardFilter.firstMatchingColumnId(columns, query: 'missing'),
+        isNull,
+      );
+    });
   });
 
   group('BoardFilter.songs', () {
@@ -56,6 +80,16 @@ void main() {
 
     test('returns original songs without filters', () {
       expect(BoardFilter.songs(songs), same(songs));
+    });
+
+    test('keeps expanded songs that do not match the key filter', () {
+      final result = BoardFilter.songs(
+        songs,
+        key: 'C',
+        retainedSongIds: const {'1'},
+      );
+
+      expect(result.map((song) => song.id), ['1', '2']);
     });
   });
 }

@@ -4,10 +4,12 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/boards/presentation/pages/board_selector_page.dart';
 import '../../features/boards/presentation/pages/board_route_page.dart';
 import '../../features/legal/presentation/pages/legal_policy_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/support/presentation/pages/create_ticket_page.dart';
 import '../../features/support/presentation/pages/help_feedback_page.dart';
 import '../../features/support/presentation/pages/my_tickets_page.dart';
 import '../../features/support/presentation/pages/ticket_details_page.dart';
+import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
 import '../../features/subscription/presentation/widgets/subscription_gate.dart';
 import '../../features/sync/presentation/widgets/initial_sync_gate.dart';
 
@@ -63,6 +65,14 @@ GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
                   state.uri.queryParameters['restored'] == 'true',
             );
           },
+        ),
+        GoRoute(
+          path: '/subscription',
+          builder: (context, state) => const SubscriptionPlansPage(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsPage(),
         ),
       ],
     ),

@@ -11,13 +11,14 @@ import '../../../../shared/models/song.dart';
 import '../../../../shared/models/song_column.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../settings/domain/entities/user_preferences.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../songs/data/isar_personal_song_edit_repository.dart';
 import '../../../songs/presentation/pages/add_edit_song_page.dart';
 import '../../../songs/presentation/pages/personal_song_edit_page.dart';
 import '../../application/board_detail_controller.dart';
-import '../../data/last_board_store.dart';
 import '../../data/board_repository.dart';
+import '../../data/last_board_store.dart';
 import '../../domain/board_filter.dart';
 import '../../domain/song_reorder.dart';
 import '../providers/search_history_provider.dart';
@@ -52,6 +53,12 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   bool get _globalDarkMode =>
       ref.read(settingsProvider).valueOrNull?.darkMode ?? false;
 
+  bool get _globalViewMode =>
+      ref.read(settingsProvider).valueOrNull?.viewMode ?? false;
+
+  bool get _globalWideSongColumns =>
+      ref.read(settingsProvider).valueOrNull?.wideSongColumns ?? false;
+
   ThemeData get _boardTheme => AppTheme.forMode(darkMode: _globalDarkMode);
 
   ColorScheme get _boardColors => _boardTheme.colorScheme;
@@ -70,6 +77,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         column.songs,
         key: _activeKey,
         accidental: _activeAccidental,
+        retainedSongIds: _expandedSongIds,
       ),
     );
     return SongColumnWidget(
@@ -78,6 +86,8 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
       showArtist: _songList.showArtist,
       showBpm: _songList.showBpm,
       isViewMode: !canMutate,
+      expandedSongIds: _expandedSongIds,
+      onSongExpansionToggle: _toggleSongExpansion,
       availableLabels: _songList.labels,
       onAddSong: () => _addSongToColumn(filteredColumn.id),
       onMenuTap: () => _showColumnMenu(filteredColumn),
@@ -102,8 +112,15 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   String? _activeAccidental;
 
   // View mode state
-  bool _isViewMode = false;
-  bool _wideSongColumns = false;
+  final Set<String> _expandedSongIds = <String>{};
+
+  void _toggleSongExpansion(String songId) {
+    setState(() {
+      if (!_expandedSongIds.add(songId)) {
+        _expandedSongIds.remove(songId);
+      }
+    });
+  }
 
   // Search state
   bool _isSearchMode = false;
@@ -111,6 +128,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   List<String> _searchSuggestions = [];
+  bool _ignoreSearchTextChanges = false;
   Timer? _debounceTimer;
   Timer? _boardReloadDebounce;
   StreamSubscription<void>? _boardSubscription;
@@ -241,6 +259,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   }
 
   void _onSearchChanged() {
+    if (_ignoreSearchTextChanges) return;
     final query = _searchController.text;
     if (!mounted) return;
     setState(() => _searchQuery = query);
@@ -300,41 +319,55 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   }
 
   Widget _buildSearchSuggestions(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Material(
-      color: colors.surface,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
-          ),
+      key: const ValueKey('search-suggestions-card'),
+      color: const Color(0xE61A2233),
+      elevation: 10,
+      shadowColor: Colors.black54,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: _searchSuggestions.length,
+        separatorBuilder: (_, _) => Divider(
+          height: 1,
+          color: Colors.white.withValues(alpha: 0.12),
+          indent: 16,
+          endIndent: 16,
         ),
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const ClampingScrollPhysics(),
-          itemCount: _searchSuggestions.length,
-          separatorBuilder: (_, _) => Divider(
-            height: 1,
-            color: colors.outline.withValues(alpha: 0.3),
-            indent: 16,
-            endIndent: 16,
-          ),
-          itemBuilder: (context, index) {
-            final suggestion = _searchSuggestions[index];
-            return ListTile(
-              leading: Icon(
-                Icons.search,
-                size: 18,
-                color: colors.onSurfaceVariant,
-              ),
-              title: Text(
-                suggestion,
-                style: TextStyle(fontSize: 15, color: colors.onSurface),
-              ),
-              onTap: () => _onSuggestionSelected(suggestion),
-            );
-          },
+        itemBuilder: (context, index) {
+          final suggestion = _searchSuggestions[index];
+          return ListTile(
+            dense: true,
+            leading: const Icon(
+              Icons.history_rounded,
+              size: 18,
+              color: Colors.white70,
+            ),
+            title: Text(
+              suggestion,
+              style: const TextStyle(fontSize: 15, color: Colors.white),
+            ),
+            onTap: () => _onSuggestionSelected(suggestion),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchSuggestionsOverlay(BuildContext context) {
+    return Positioned(
+      top: 8,
+      left: 12,
+      right: 12,
+      bottom: 8,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 280),
+          child: _buildSearchSuggestions(context),
         ),
       ),
     );
@@ -382,6 +415,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           availableArtists: _songList.artists.map((a) => a.name).toList(),
           availableLabels: _songList.labels,
           onAddArtist: _addArtistFromSongEditor,
+          onAddLabel: _showAddLabelDialog,
           onDownloadAttachment: _repository.downloadAttachment,
           onSave: (song) async {
             final column = _songList.columns.firstWhere(
@@ -432,6 +466,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
           availableArtists: allArtistNames,
           availableLabels: _songList.labels,
           onAddArtist: _addArtistFromSongEditor,
+          onAddLabel: _showAddLabelDialog,
           onDownloadAttachment: _repository.downloadAttachment,
           onSave: (updatedSong) async {
             final savedSong = await _repository.updateSong(updatedSong);
@@ -646,13 +681,29 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   }
 
   void _setViewMode(bool enabled) {
-    if (!mounted || _isViewMode == enabled) return;
-    setState(() => _isViewMode = enabled);
+    if (!mounted || _globalViewMode == enabled) return;
+    unawaited(_updateViewMode(enabled));
   }
 
   void _setWideSongColumns(bool enabled) {
-    if (!mounted || _wideSongColumns == enabled) return;
-    setState(() => _wideSongColumns = enabled);
+    if (!mounted || _globalWideSongColumns == enabled) return;
+    unawaited(_updateWideSongColumns(enabled));
+  }
+
+  Future<void> _updateViewMode(bool enabled) async {
+    try {
+      await ref.read(settingsProvider.notifier).updateViewMode(enabled);
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
+
+  Future<void> _updateWideSongColumns(bool enabled) async {
+    try {
+      await ref.read(settingsProvider.notifier).updateWideSongColumns(enabled);
+    } on Exception catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   Future<void> _removeLabel(String id) async {
@@ -668,55 +719,70 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
-  void _showMenu() {
-    showModalBottomSheet(
+  Future<void> _showMenu() async {
+    var addLabelRequested = false;
+    Label? labelToEdit;
+    ModalRoute<dynamic>? menuRoute;
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true, // ADD THIS - keeps content away from status bar
       backgroundColor: _boardColors.surface,
-      builder: (_) => _applyBoardTheme(
-        MenuBottomSheet(
-          readOnly: !_songList.canEdit,
-          viewMode: _isViewMode || !_songList.canEdit,
-          wideColumns: _wideSongColumns,
-          showArtist: _songList.showArtist,
-          showBpm: _songList.showBpm,
-          darkMode: _globalDarkMode,
-          artists: _songList.artists,
-          labels: _songList.labels,
-          onViewModeChanged: _setViewMode,
-          onWideColumnsChanged: _setWideSongColumns,
-          onShowArtistChanged: (val) =>
-              _saveBoard(_songList.copyWith(showArtist: val)),
-          onShowBpmChanged: (val) =>
-              _saveBoard(_songList.copyWith(showBpm: val)),
-          onDarkModeChanged: _changeGlobalDarkMode,
-          onAddArtist: _showArtistDialog,
-          onRemoveArtist: _removeArtist,
-          onUpdateArtist: _showArtistDialog,
-          onAddLabel: (name) {
-            _showAddLabelDialog();
-          },
-          onUpdateLabel: (label) {
-            _showAddLabelDialog(label);
-          },
-          onRemoveLabel: _removeLabel,
-          onExport: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Export feature coming soon')),
-            );
-          },
-          onImport: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Import feature coming soon')),
-            );
-          },
-        ),
-      ),
+      builder: (menuContext) {
+        menuRoute ??= ModalRoute.of(menuContext);
+        return _applyBoardTheme(
+          MenuBottomSheet(
+            readOnly: !_songList.canEdit,
+            viewMode: _globalViewMode || !_songList.canEdit,
+            wideColumns: _globalWideSongColumns,
+            showArtist: _songList.showArtist,
+            showBpm: _songList.showBpm,
+            darkMode: _globalDarkMode,
+            artists: _songList.artists,
+            labels: _songList.labels,
+            onViewModeChanged: _setViewMode,
+            onWideColumnsChanged: _setWideSongColumns,
+            onShowArtistChanged: (val) =>
+                _saveBoard(_songList.copyWith(showArtist: val)),
+            onShowBpmChanged: (val) =>
+                _saveBoard(_songList.copyWith(showBpm: val)),
+            onDarkModeChanged: _changeGlobalDarkMode,
+            onAddArtist: _showArtistDialog,
+            onRemoveArtist: _removeArtist,
+            onUpdateArtist: _showArtistDialog,
+            onAddLabel: () {
+              addLabelRequested = true;
+              Navigator.of(menuContext).pop();
+            },
+            onUpdateLabel: (label) {
+              labelToEdit = label;
+              Navigator.of(menuContext).pop();
+            },
+            onRemoveLabel: _removeLabel,
+            onExport: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Export feature coming soon')),
+              );
+            },
+            onImport: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Import feature coming soon')),
+              );
+            },
+          ),
+        );
+      },
     );
+
+    if (!addLabelRequested && labelToEdit == null) return;
+    await menuRoute?.completed;
+    if (!mounted) return;
+    await _showAddLabelDialog(existingLabel: labelToEdit);
+    if (mounted) unawaited(_showMenu());
   }
 
   Future<void> _showArtistDialog([Artist? existing]) async {
@@ -783,15 +849,15 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
-  void _showAddLabelDialog([Label? existingLabel]) {
-    Navigator.pop(context); // Close menu first
-
+  Future<Label?> _showAddLabelDialog({Label? existingLabel}) async {
     final controller = TextEditingController(text: existingLabel?.name);
     Color selectedColor = existingLabel?.color ?? Colors.blue;
+    ModalRoute<dynamic>? dialogRoute;
 
-    showDialog(
+    final result = await showDialog<Label>(
       context: context,
       builder: (dialogContext) {
+        dialogRoute ??= ModalRoute.of(dialogContext);
         return _applyBoardTheme(
           StatefulBuilder(
             builder: (context, setDialogState) {
@@ -954,7 +1020,6 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                             child: OutlinedButton(
                               onPressed: () {
                                 Navigator.pop(dialogContext);
-                                _showMenu();
                               },
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
@@ -1004,28 +1069,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                                   if (!mounted || !dialogContext.mounted) {
                                     return;
                                   }
-                                  setState(() {
-                                    final labels = existingLabel == null
-                                        ? [..._songList.labels, label]
-                                        : _songList.labels
-                                              .map(
-                                                (item) => item.id == label.id
-                                                    ? label
-                                                    : item,
-                                              )
-                                              .toList();
-                                    _songList = _songList.copyWith(
-                                      labels: labels,
-                                    );
-                                  });
-                                  Navigator.pop(dialogContext);
-                                  if (existingLabel == null) {
-                                    AppSnackbar.showSuccess(
-                                      context,
-                                      'Label created',
-                                    );
-                                  }
-                                  _showMenu();
+                                  Navigator.pop(dialogContext, label);
                                 } on Exception catch (error) {
                                   if (mounted) _showError(error);
                                 }
@@ -1047,6 +1091,22 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
         );
       },
     );
+    await dialogRoute?.completed;
+    controller.dispose();
+    if (result != null && mounted) {
+      setState(() {
+        final labels = existingLabel == null
+            ? [..._songList.labels, result]
+            : _songList.labels
+                  .map((item) => item.id == result.id ? result : item)
+                  .toList();
+        _songList = _songList.copyWith(labels: labels);
+      });
+      if (existingLabel == null) {
+        AppSnackbar.showSuccess(context, 'Label created');
+      }
+    }
+    return result;
   }
 
   void _showColumnMenu(SongColumn column) {
@@ -1119,10 +1179,29 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
-  void _showSearch() {
+  void _showSearch() => _resetSearch(keepOpen: true);
+
+  void _confirmSearch() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      _hideSuggestions();
+      _searchFocusNode.unfocus();
+      return;
+    }
+
+    unawaited(ref.read(searchHistoryProvider.notifier).addSearch(query));
+    _ignoreSearchTextChanges = true;
+    try {
+      _searchController.clear();
+    } finally {
+      _ignoreSearchTextChanges = false;
+    }
+    _debounceTimer?.cancel();
     setState(() {
-      _isSearchMode = true;
+      _searchQuery = query;
+      _searchSuggestions = [];
     });
+    _searchFocusNode.unfocus();
   }
 
   void _submitSearch([String? value]) {
@@ -1132,11 +1211,14 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     _searchFocusNode.unfocus();
   }
 
-  void _closeSearch() {
+  void _closeSearch() => _resetSearch(keepOpen: false);
+
+  void _resetSearch({required bool keepOpen}) {
     _searchController.clear();
     _debounceTimer?.cancel();
+    if (!keepOpen) _searchFocusNode.unfocus();
     setState(() {
-      _isSearchMode = false;
+      _isSearchMode = keepOpen;
       _searchQuery = '';
       _searchSuggestions = [];
     });
@@ -1144,7 +1226,8 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final settingsState = ref.watch(settingsProvider);
+    if (_isLoading || settingsState.isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.bg,
         body: Center(child: CircularProgressIndicator()),
@@ -1166,16 +1249,23 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     final filteredColumns = BoardFilter.columns(
       _songList.columns,
       query: _searchQuery,
+      retainedSongIds: _expandedSongIds,
     );
+    final matchingColumnId = BoardFilter.firstMatchingColumnId(
+      _songList.columns,
+      query: _searchQuery,
+    );
+    final matchingColumnIndex = matchingColumnId == null
+        ? null
+        : filteredColumns.indexWhere((column) => column.id == matchingColumnId);
     final hasFilters =
         _activeKey != null ||
         _activeAccidental != null ||
         _searchQuery.isNotEmpty;
-    final canMutate = _songList.canEdit && !_isViewMode;
+    final preferences = settingsState.valueOrNull ?? const UserPreferences();
+    final canMutate = _songList.canEdit && !preferences.viewMode;
     final canReorder = !hasFilters && canMutate;
-    final globalTheme = AppTheme.forMode(
-      darkMode: ref.watch(settingsProvider).valueOrNull?.darkMode ?? false,
-    );
+    final globalTheme = AppTheme.forMode(darkMode: preferences.darkMode);
 
     return Theme(
       data: globalTheme,
@@ -1216,7 +1306,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                     IconButton(
                       tooltip: 'Search songs',
                       icon: const Icon(Icons.search, size: 22),
-                      onPressed: _submitSearch,
+                      onPressed: _confirmSearch,
                     ),
                   ]
                 : [
@@ -1245,143 +1335,144 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                     //   ),
                   ],
           ),
-          body: Column(
+          body: Stack(
             children: [
-              // Search suggestions overlay
-              if (_isSearchMode && _searchSuggestions.isNotEmpty)
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: _buildSearchSuggestions(context),
-                ),
+              Column(
+                children: [
+                  // Key filter bar - hide when search has no results
+                  if (filteredColumns.isNotEmpty)
+                    KeyFilterBar(
+                      activeKey: _activeKey,
+                      activeAccidental: _activeAccidental,
+                      onKeySelected: (key) {
+                        setState(() => _activeKey = key);
+                      },
+                      onAccidentalSelected: (acc) {
+                        setState(() => _activeAccidental = acc);
+                      },
+                      onClear: () {
+                        setState(() {
+                          _activeKey = null;
+                          _activeAccidental = null;
+                        });
+                      },
+                    ),
 
-              // Key filter bar - hide when search has no results
-              if (filteredColumns.isNotEmpty)
-                KeyFilterBar(
-                  activeKey: _activeKey,
-                  activeAccidental: _activeAccidental,
-                  onKeySelected: (key) {
-                    setState(() => _activeKey = key);
-                  },
-                  onAccidentalSelected: (acc) {
-                    setState(() => _activeAccidental = acc);
-                  },
-                  onClear: () {
-                    setState(() {
-                      _activeKey = null;
-                      _activeAccidental = null;
-                    });
-                  },
-                ),
-
-              // Columns (horizontal scrolling)
-              Expanded(
-                child: filteredColumns.isEmpty
-                    ? _searchQuery.isNotEmpty
-                          // Search returned no results
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.search_off,
-                                    size: 64,
-                                    color: Colors.white.withValues(alpha: 0.55),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'No results found',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Try a different search term',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.7,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          // Board is empty
-                          : Center(
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.view_column_outlined,
-                                      size: 64,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.55,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'No song lists yet',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Create your first song list to get started.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 14,
+                  // Columns (horizontal scrolling)
+                  Expanded(
+                    child: filteredColumns.isEmpty
+                        ? _searchQuery.isNotEmpty
+                              // Search returned no results
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.search_off,
+                                        size: 64,
                                         color: Colors.white.withValues(
-                                          alpha: 0.7,
+                                          alpha: 0.55,
                                         ),
                                       ),
-                                    ),
-
-                                    if (canMutate) ...[
-                                      const SizedBox(height: 24),
-                                      ElevatedButton.icon(
-                                        onPressed: _addColumn,
-                                        icon: const Icon(Icons.add),
-                                        label: const Text('Create Song List'),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'No results found',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Try a different search term',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
                                       ),
                                     ],
-                                  ],
-                                ),
+                                  ),
+                                )
+                              // Board is empty
+                              : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.view_column_outlined,
+                                        size: 64,
+                                        color: Colors.white.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'No song lists yet',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Create your first song list to get started.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
+                                      ),
+                                      if (canMutate) ...[
+                                        const SizedBox(height: 24),
+                                        ElevatedButton.icon(
+                                          onPressed: _addColumn,
+                                          icon: const Icon(Icons.add),
+                                          label: const Text('Create Song List'),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                )
+                        // Board has columns
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 16),
+                            child: MagneticColumnPager(
+                              initialPage: _initialColumnIndex,
+                              requestedPage: matchingColumnIndex == -1
+                                  ? null
+                                  : matchingColumnIndex,
+                              viewportFraction: preferences.wideSongColumns
+                                  ? MagneticColumnPager.wideViewportFraction
+                                  : MagneticColumnPager.normalViewportFraction,
+                              itemCount: filteredColumns.length,
+                              itemBuilder: (_, index) => _buildColumnPage(
+                                filteredColumns[index],
+                                canMutate: canMutate,
+                                canReorder: canReorder,
                               ),
-                            )
-                    // Board has columns
-                    : Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 16),
-                        child: MagneticColumnPager(
-                          initialPage: _initialColumnIndex,
-                          viewportFraction: _wideSongColumns
-                              ? MagneticColumnPager.wideViewportFraction
-                              : MagneticColumnPager.normalViewportFraction,
-                          itemCount: filteredColumns.length,
-                          itemBuilder: (_, index) => _buildColumnPage(
-                            filteredColumns[index],
-                            canMutate: canMutate,
-                            canReorder: canReorder,
+                              onPageChanged: hasFilters
+                                  ? null
+                                  : (index) {
+                                      if (index < _songList.columns.length) {
+                                        unawaited(_rememberColumnIndex(index));
+                                      }
+                                    },
+                              trailing: canMutate
+                                  ? AddColumnButton(onTap: _addColumn)
+                                  : null,
+                            ),
                           ),
-                          onPageChanged: hasFilters
-                              ? null
-                              : (index) {
-                                  if (index < _songList.columns.length) {
-                                    unawaited(_rememberColumnIndex(index));
-                                  }
-                                },
-                          trailing: canMutate
-                              ? AddColumnButton(onTap: _addColumn)
-                              : null,
-                        ),
-                      ),
+                  ),
+                ],
               ),
+              if (_isSearchMode && _searchSuggestions.isNotEmpty)
+                _buildSearchSuggestionsOverlay(context),
             ],
           ),
         ),

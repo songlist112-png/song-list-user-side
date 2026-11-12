@@ -40,4 +40,21 @@ void main() {
 
     expect(controller.state.asData?.value.darkMode, isFalse);
   });
+
+  test(
+    'board display preferences update together with existing settings',
+    () async {
+      final repository = _SettingsRepository();
+      final controller = SettingsController(repository);
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.updateViewMode(true);
+      await controller.updateWideSongColumns(true);
+
+      expect(controller.state.asData?.value.viewMode, isTrue);
+      expect(controller.state.asData?.value.wideSongColumns, isTrue);
+      expect(repository.preferences.viewMode, isTrue);
+      expect(repository.preferences.wideSongColumns, isTrue);
+    },
+  );
 }

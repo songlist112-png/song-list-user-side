@@ -4,10 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../../core/constants/env.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../shared/models/song_list.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
@@ -736,29 +734,7 @@ class _BoardStat extends StatelessWidget {
 class _ProfileMenu extends ConsumerWidget {
   const _ProfileMenu({required this.onSignOut});
 
-  static final _subscriptionUri = Uri.parse(Env.subscriptionPortalUrl);
-
   final Future<void> Function() onSignOut;
-
-  Future<void> _openSubscription(BuildContext context) async {
-    try {
-      final opened = await launchUrl(
-        _subscriptionUri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!opened && context.mounted) {
-        _showLaunchError(context);
-      }
-    } on Exception {
-      if (context.mounted) _showLaunchError(context);
-    }
-  }
-
-  void _showLaunchError(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open subscription page')),
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -794,9 +770,11 @@ class _ProfileMenu extends ConsumerWidget {
     return PopupMenuButton<String>(
       onSelected: (value) {
         if (value == 'subscription') {
-          unawaited(_openSubscription(context));
+          context.push('/subscription');
         } else if (value == 'support') {
           context.push('/support');
+        } else if (value == 'settings') {
+          context.push('/settings');
         } else if (value == 'logout') {
           onSignOut();
         }
@@ -817,9 +795,9 @@ class _ProfileMenu extends ConsumerWidget {
         const PopupMenuDivider(height: 10),
         _buildItem(
           value: 'subscription',
-          icon: Icons.workspace_premium_outlined,
+          icon: Icons.attach_money_rounded,
           color: AppColors.accent,
-          label: 'Subscription',
+          label: 'Plans & Billing',
           colors: colors,
         ),
         _buildItem(
@@ -827,6 +805,13 @@ class _ProfileMenu extends ConsumerWidget {
           icon: Icons.help_outline_rounded,
           color: colors.onSurfaceVariant,
           label: 'Help & Feedback',
+          colors: colors,
+        ),
+        _buildItem(
+          value: 'settings',
+          icon: Icons.settings_outlined,
+          color: colors.onSurfaceVariant,
+          label: 'Settings',
           colors: colors,
         ),
         _buildItem(
@@ -967,12 +952,16 @@ class _ProfileMenu extends ConsumerWidget {
             child: Icon(icon, size: 20, color: color),
           ),
           const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: colors.onSurface,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: colors.onSurface,
+              ),
             ),
           ),
         ],

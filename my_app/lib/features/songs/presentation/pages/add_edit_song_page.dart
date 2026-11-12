@@ -21,6 +21,7 @@ class AddEditSongPage extends StatefulWidget {
   final Future<void> Function(Song) onSave;
   final Future<void> Function()? onDelete;
   final Future<String?> Function()? onAddArtist;
+  final Future<Label?> Function()? onAddLabel;
   final Future<Uint8List> Function(SongAttachment)? onDownloadAttachment;
   final Future<void> Function(String path, String mediaType)? onOpenAttachment;
 
@@ -32,6 +33,7 @@ class AddEditSongPage extends StatefulWidget {
     required this.onSave,
     this.onDelete,
     this.onAddArtist,
+    this.onAddLabel,
     this.onDownloadAttachment,
     this.onOpenAttachment,
   });
@@ -48,11 +50,13 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
   late final TextEditingController _lyricsController;
   String? _selectedArtist;
   late final List<String> _availableArtists;
+  late final List<Label> _availableLabels;
   String? _selectedKey;
   String _selectedKeyType = 'Major';
   List<SongAttachment> _attachments = [];
   List<String> _selectedLabelIds = [];
   bool _isAddingArtist = false;
+  bool _isAddingLabel = false;
   static const List<String> _keys = [
     '(none)',
     "C",
@@ -89,6 +93,7 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
     );
     _selectedArtist = widget.existingSong?.artistName;
     _availableArtists = [...widget.availableArtists];
+    _availableLabels = [...widget.availableLabels];
     if (_selectedArtist case final artist?
         when !_availableArtists.contains(artist)) {
       _availableArtists.add(artist);
@@ -169,6 +174,28 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
       if (mounted) _showError(error, action: 'create artist');
     } finally {
       if (mounted) setState(() => _isAddingArtist = false);
+    }
+  }
+
+  Future<void> _handleAddLabel() async {
+    final addLabel = widget.onAddLabel;
+    if (addLabel == null || _isAddingLabel) return;
+    setState(() => _isAddingLabel = true);
+    try {
+      final label = await addLabel();
+      if (!mounted || label == null) return;
+      setState(() {
+        if (!_availableLabels.any((item) => item.id == label.id)) {
+          _availableLabels.add(label);
+        }
+        if (!_selectedLabelIds.contains(label.id)) {
+          _selectedLabelIds.add(label.id);
+        }
+      });
+    } on Exception catch (error) {
+      if (mounted) _showError(error, action: 'create label');
+    } finally {
+      if (mounted) setState(() => _isAddingLabel = false);
     }
   }
 
@@ -431,122 +458,7 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
             const SizedBox(height: 24),
 
             // Labels Section
-            _buildSection(
-              title: 'LABELS',
-              children: [
-                if (widget.availableLabels.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _colors.surfaceContainerHighest.withValues(
-                        alpha: 0.5,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _colors.outline.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 18,
-                          color: _colors.onSurfaceVariant,
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'No labels available. Add labels in the menu.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: widget.availableLabels.map((label) {
-                      final isSelected = _selectedLabelIds.contains(label.id);
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        child: InkWell(
-                          onTap: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selectedLabelIds.remove(label.id);
-                              } else {
-                                _selectedLabelIds.add(label.id);
-                              }
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? label.color.withValues(alpha: 0.15)
-                                  : _colors.surface,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected
-                                    ? label.color
-                                    : _colors.outline.withValues(alpha: 0.5),
-                                width: isSelected ? 2 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isSelected)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Icon(
-                                      Icons.check_circle,
-                                      size: 16,
-                                      color: label.color,
-                                    ),
-                                  )
-                                else
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Container(
-                                      width: 14,
-                                      height: 14,
-                                      decoration: BoxDecoration(
-                                        color: label.color,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                                Text(
-                                  label.name,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isSelected
-                                        ? _colors.onSurface
-                                        : _colors.onSurfaceVariant,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-              ],
-            ),
+            _buildLabelsSection(),
 
             const SizedBox(height: 24),
 
@@ -741,6 +653,149 @@ class _AddEditSongPageState extends State<AddEditSongPage> {
         ),
         ...children,
       ],
+    );
+  }
+
+  Widget _buildLabelsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'LABELS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _colors.onSurfaceVariant,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              if (widget.onAddLabel != null)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: IconButton(
+                    onPressed: _isAddingLabel ? null : _handleAddLabel,
+                    icon: _isAddingLabel
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add, size: 20),
+                    color: AppColors.accent,
+                    tooltip: 'Add new label',
+                  ),
+                ),
+            ],
+          ),
+        ),
+        _buildAvailableLabels(),
+      ],
+    );
+  }
+
+  Widget _buildAvailableLabels() {
+    if (_availableLabels.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _colors.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _colors.outline.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 18, color: _colors.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No labels yet.',
+                style: TextStyle(fontSize: 13, color: _colors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Wrap(
+        alignment: WrapAlignment.start,
+        spacing: 10,
+        runSpacing: 10,
+        children: _availableLabels.map((label) {
+          final isSelected = _selectedLabelIds.contains(label.id);
+          return InkWell(
+            onTap: () {
+              setState(() {
+                if (isSelected) {
+                  _selectedLabelIds.remove(label.id);
+                } else {
+                  _selectedLabelIds.add(label.id);
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? label.color.withValues(alpha: 0.15)
+                    : _colors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? label.color
+                      : _colors.outline.withValues(alpha: 0.5),
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSelected)
+                    Icon(Icons.check_circle, size: 16, color: label.color)
+                  else
+                    Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: label.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    label.name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isSelected
+                          ? _colors.onSurface
+                          : _colors.onSurfaceVariant,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 

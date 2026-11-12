@@ -23,73 +23,75 @@ class KeyFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Key buttons
-                  ...keys.map(
-                    (key) => _buildFilterChip(
-                      label: key,
-                      isActive: activeKey == key,
-                      onTap: () {
-                        if (activeKey == key) {
-                          onKeySelected(null);
-                        } else {
-                          onKeySelected(key);
-                        }
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  // Flat button
-                  _buildFilterChip(
-                    label: '♭',
-                    isActive: activeAccidental == 'flat',
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Row(
+            children: [
+              // Key buttons
+              ...keys.map(
+                (key) => Expanded(
+                  child: _buildFilterChip(
+                    label: key,
+                    isActive: activeKey == key,
                     onTap: () {
-                      if (activeAccidental == 'flat') {
-                        onAccidentalSelected(null);
+                      if (activeKey == key) {
+                        onKeySelected(null);
                       } else {
-                        onAccidentalSelected('flat');
+                        onKeySelected(key);
                       }
                     },
                   ),
-
-                  // Sharp button
-                  _buildFilterChip(
-                    label: '♯',
-                    isActive: activeAccidental == 'sharp',
-                    onTap: () {
-                      if (activeAccidental == 'sharp') {
-                        onAccidentalSelected(null);
-                      } else {
-                        onAccidentalSelected('sharp');
-                      }
-                    },
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  // Clear button
-                  _buildFilterChip(
-                    label: '✕',
-                    isActive: false,
-                    onTap: onClear,
-                    isCancel: true,
-                  ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
+
+              const SizedBox(width: 6),
+
+              // Flat button
+              Expanded(
+                child: _buildFilterChip(
+                  label: '♭',
+                  isActive: activeAccidental == 'flat',
+                  onTap: () {
+                    if (activeAccidental == 'flat') {
+                      onAccidentalSelected(null);
+                    } else {
+                      onAccidentalSelected('flat');
+                    }
+                  },
+                ),
+              ),
+
+              // Sharp button
+              Expanded(
+                child: _buildFilterChip(
+                  label: '♯',
+                  isActive: activeAccidental == 'sharp',
+                  onTap: () {
+                    if (activeAccidental == 'sharp') {
+                      onAccidentalSelected(null);
+                    } else {
+                      onAccidentalSelected('sharp');
+                    }
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              // Clear button
+              Expanded(
+                child: _buildFilterChip(
+                  label: '✕',
+                  isActive: false,
+                  onTap: onClear,
+                  isCancel: true,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -105,7 +107,6 @@ class KeyFilterBar extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 32,
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(

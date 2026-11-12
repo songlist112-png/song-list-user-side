@@ -31,7 +31,7 @@ void main() {
             onAddArtist: () {},
             onRemoveArtist: (_) async {},
             onUpdateArtist: (_) {},
-            onAddLabel: (_) {},
+            onAddLabel: () {},
             onUpdateLabel: (_) {},
             onRemoveLabel: (_) async {},
           ),
@@ -49,7 +49,7 @@ void main() {
     expect(find.byTooltip('Admin artist · read only'), findsOneWidget);
   });
 
-  testWidgets('admin-created board menu is visible but read only', (
+  testWidgets('admin board keeps display settings but management read only', (
     tester,
   ) async {
     var darkModeEnabled = false;
@@ -76,7 +76,7 @@ void main() {
             onAddArtist: () {},
             onRemoveArtist: (_) async {},
             onUpdateArtist: (_) {},
-            onAddLabel: (_) {},
+            onAddLabel: () {},
             onUpdateLabel: (_) {},
             onRemoveLabel: (_) async {},
           ),
@@ -84,13 +84,9 @@ void main() {
       ),
     );
 
-    expect(find.text('Admin-created board · read only'), findsOneWidget);
     final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
-    expect(switches[0].onChanged, isNull);
-    expect(switches[1].onChanged, isNotNull);
-    expect(switches[2].onChanged, isNull);
-    expect(switches[3].onChanged, isNull);
-    expect(switches.last.onChanged, isNotNull);
+    expect(switches, hasLength(5));
+    expect(switches.every((control) => control.onChanged != null), isTrue);
     await tester.tap(find.byType(Switch).last);
     await tester.pumpAndSettle();
     expect(darkModeEnabled, isTrue);
@@ -120,7 +116,7 @@ void main() {
             onAddArtist: () {},
             onRemoveArtist: (_) async {},
             onUpdateArtist: (_) {},
-            onAddLabel: (_) {},
+            onAddLabel: () {},
             onUpdateLabel: (_) {},
             onRemoveLabel: (_) async {},
           ),
@@ -169,7 +165,7 @@ void main() {
             onAddArtist: () {},
             onRemoveArtist: (_) async {},
             onUpdateArtist: (_) {},
-            onAddLabel: (_) {},
+            onAddLabel: () {},
             onUpdateLabel: (_) {},
             onRemoveLabel: (_) async {},
           ),
@@ -205,7 +201,7 @@ void main() {
             onAddArtist: () {},
             onRemoveArtist: (_) async {},
             onUpdateArtist: (_) {},
-            onAddLabel: (_) {},
+            onAddLabel: () {},
             onUpdateLabel: (_) {},
             onRemoveLabel: (_) async {},
           ),
@@ -272,7 +268,7 @@ MenuBottomSheet _buildMenuBottomSheet() => MenuBottomSheet(
   onAddArtist: () {},
   onRemoveArtist: (_) async {},
   onUpdateArtist: (_) {},
-  onAddLabel: (_) {},
+  onAddLabel: () {},
   onUpdateLabel: (_) {},
   onRemoveLabel: (_) async {},
 );

@@ -84,6 +84,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
     final payload = <String, Object?>{
       'lyrics_font_scale': model.lyricsFontScale,
       'dark_mode': model.darkMode,
+      'view_mode': model.viewMode,
+      'wide_song_columns': model.wideSongColumns,
       'updated_at': now.toIso8601String(),
     };
     await _isar.writeTxn(() async {
