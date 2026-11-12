@@ -128,6 +128,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   List<String> _searchSuggestions = [];
+  bool _ignoreSearchTextChanges = false;
   Timer? _debounceTimer;
   Timer? _boardReloadDebounce;
   StreamSubscription<void>? _boardSubscription;
@@ -258,6 +259,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
   }
 
   void _onSearchChanged() {
+    if (_ignoreSearchTextChanges) return;
     final query = _searchController.text;
     if (!mounted) return;
     setState(() => _searchQuery = query);
@@ -1177,10 +1179,29 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     }
   }
 
-  void _showSearch() {
+  void _showSearch() => _resetSearch(keepOpen: true);
+
+  void _confirmSearch() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      _hideSuggestions();
+      _searchFocusNode.unfocus();
+      return;
+    }
+
+    unawaited(ref.read(searchHistoryProvider.notifier).addSearch(query));
+    _ignoreSearchTextChanges = true;
+    try {
+      _searchController.clear();
+    } finally {
+      _ignoreSearchTextChanges = false;
+    }
+    _debounceTimer?.cancel();
     setState(() {
-      _isSearchMode = true;
+      _searchQuery = query;
+      _searchSuggestions = [];
     });
+    _searchFocusNode.unfocus();
   }
 
   void _submitSearch([String? value]) {
@@ -1190,11 +1211,14 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
     _searchFocusNode.unfocus();
   }
 
-  void _closeSearch() {
+  void _closeSearch() => _resetSearch(keepOpen: false);
+
+  void _resetSearch({required bool keepOpen}) {
     _searchController.clear();
     _debounceTimer?.cancel();
+    if (!keepOpen) _searchFocusNode.unfocus();
     setState(() {
-      _isSearchMode = false;
+      _isSearchMode = keepOpen;
       _searchQuery = '';
       _searchSuggestions = [];
     });
@@ -1282,7 +1306,7 @@ class _BoardViewPageState extends ConsumerState<BoardViewPage> {
                     IconButton(
                       tooltip: 'Search songs',
                       icon: const Icon(Icons.search, size: 22),
-                      onPressed: _submitSearch,
+                      onPressed: _confirmSearch,
                     ),
                   ]
                 : [

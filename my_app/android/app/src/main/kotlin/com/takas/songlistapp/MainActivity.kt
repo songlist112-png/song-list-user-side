@@ -1,4 +1,4 @@
-package com.example.songList
+package com.takas.songlistapp
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -99,6 +99,29 @@ void main() {
     expect(find.text('Library'), findsOneWidget);
   });
 
+  testWidgets('keeps BPM together beside Hebrew artist text', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SongCardWidget(
+            song: Song(
+              id: 'bidi-song',
+              title: 'Bidi metadata',
+              artistName: 'שלום',
+              tempo: 68,
+            ),
+            showBpm: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('שלום'), findsOneWidget);
+    final bpmText = tester.widget<Text>(find.text('68 BPM'));
+    expect(bpmText.textDirection, TextDirection.ltr);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('dark board theme recolors columns and cards only', (
     tester,
   ) async {

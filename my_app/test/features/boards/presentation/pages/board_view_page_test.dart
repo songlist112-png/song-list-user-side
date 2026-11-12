@@ -30,7 +30,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   registerFallbackValue(const Song(id: 'fallback', title: 'Fallback'));
 
-  testWidgets('glass confirms search and back arrow resets it', (tester) async {
+  testWidgets('glass clears text but keeps results until back closes search', (
+    tester,
+  ) async {
     await _pumpBoardPage(tester);
 
     await tester.tap(find.byTooltip('Search'));
@@ -46,7 +48,7 @@ void main() {
 
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller?.text,
-      'Amazing',
+      '',
     );
     expect(find.text('Amazing Grace'), findsOneWidget);
     expect(find.text('Way Maker'), findsNothing);

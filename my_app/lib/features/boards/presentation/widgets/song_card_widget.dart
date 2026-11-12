@@ -42,6 +42,7 @@ class SongCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final metaStyle = TextStyle(fontSize: 12, color: colors.onSurfaceVariant);
     final statusLabel = song.hasPersonalEdit
         ? 'Edited'
         : song.creatorType == SongCreatorType.admin
@@ -51,11 +52,13 @@ class SongCardWidget extends StatelessWidget {
         ? AppColors.personalEdit
         : AppColors.accent;
 
-    final metaItems = <String>[
-      if (song.key != null && song.key!.isNotEmpty) song.keyDisplay,
+    final metaItems = <_MetaItem>[
+      if (song.key != null && song.key!.isNotEmpty)
+        _MetaItem(song.keyDisplay, textDirection: TextDirection.ltr),
       if (showArtist && song.artistName != null && song.artistName!.isNotEmpty)
-        song.artistName!,
-      if (showBpm && song.tempo != null) '${song.tempo} BPM',
+        _MetaItem(song.artistName!),
+      if (showBpm && song.tempo != null)
+        _MetaItem('${song.tempo} BPM', textDirection: TextDirection.ltr),
     ];
 
     final labelChips = _getLabels()
@@ -144,20 +147,18 @@ class SongCardWidget extends StatelessWidget {
                     if (metaItems.isNotEmpty || song.attachments.isNotEmpty)
                       const SizedBox(width: 10),
                   ],
-                  if (metaItems.isNotEmpty)
+                  if (metaItems.isNotEmpty) ...[
                     Expanded(
                       child: Text.rich(
                         TextSpan(
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colors.onSurfaceVariant,
-                          ),
-                          children: _joinMeta(metaItems),
+                          style: metaStyle,
+                          children: _joinMeta(metaItems, metaStyle),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                  ],
                   if (song.attachments.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     _AttachmentCount(count: song.attachments.length),
@@ -182,7 +183,7 @@ class SongCardWidget extends StatelessWidget {
     );
   }
 
-  List<InlineSpan> _joinMeta(List<String> items) {
+  List<InlineSpan> _joinMeta(List<_MetaItem> items, TextStyle style) {
     final spans = <InlineSpan>[];
     for (var i = 0; i < items.length; i++) {
       if (i > 0) {
@@ -196,7 +197,19 @@ class SongCardWidget extends StatelessWidget {
           ),
         );
       }
-      spans.add(TextSpan(text: items[i]));
+      final item = items[i];
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: Text(
+            item.text,
+            maxLines: 1,
+            textDirection: item.textDirection,
+            style: style,
+          ),
+        ),
+      );
     }
     return spans;
   }
@@ -214,6 +227,13 @@ class SongCardWidget extends StatelessWidget {
         .whereType<Label>()
         .toList();
   }
+}
+
+class _MetaItem {
+  const _MetaItem(this.text, {this.textDirection});
+
+  final String text;
+  final TextDirection? textDirection;
 }
 
 class _StatusPill extends StatelessWidget {
